@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# Environment variables (contains API keys!)
+.env
+
+# ChromaDB local data (rebuilds from clinical_guidelines.json)
+src/backend/data/chroma/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Node.js
+node_modules/
+.next/
+out/
+
+# Test outputs
+results.json
+
+# Models (too large for git)
+models/*.bin
+models/*.pt
+models/*.onnx
+models/*.safetensors
+
+# Notebooks checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log

@@ -1,0 +1,1 @@
+kaggle competitions download -c med-gemma-impact-challenge
