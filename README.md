@@ -15,35 +15,36 @@ A clinician pastes a patient case. The system automatically:
 2. **Reasons** about the case to generate a ranked differential diagnosis with chain-of-thought transparency
 3. **Checks drug interactions** against OpenFDA and RxNorm databases
 4. **Retrieves clinical guidelines** from a 62-guideline RAG corpus spanning 14 medical specialties
-5. **Synthesizes** everything into a structured CDS report with recommendations, warnings, and citations
+5. **Detects conflicts** between guideline recommendations and the patient's actual data — surfacing omissions, contradictions, dosage concerns, and monitoring gaps
+6. **Synthesizes** everything into a structured CDS report with recommendations, warnings, conflicts, and citations
 
-All five steps stream to the frontend in real time via WebSocket — the clinician sees each step execute live.
+All six steps stream to the frontend in real time via WebSocket — the clinician sees each step execute live.
 
 ---
 
 ## System Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                    FRONTEND (Next.js 14 + React)                │
-│  Patient Case Input  │  Agent Activity Feed  │  CDS Report View │
-└──────────────────────────┬──────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────┐
+│                    FRONTEND (Next.js 14 + React)                    │
+│  Patient Case Input  │  Agent Activity Feed  │  CDS Report View    │
+└──────────────────────────┬──────────────────────────────────────────┘
                            │ REST API + WebSocket
-┌──────────────────────────▼──────────────────────────────────────┐
-│                     BACKEND (FastAPI + Python 3.10)              │
-│                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │              ORCHESTRATOR (5-Step Pipeline)                 │  │
-│  └─────┬──────────┬──────────┬──────────┬──────────┬─────────┘  │
-│   ┌────▼───┐ ┌───▼────┐ ┌──▼───┐ ┌───▼────┐ ┌───▼─────┐      │
-│   │ Parse  │ │Reason  │ │ Drug │ │  RAG   │ │Synth-   │      │
-│   │Patient │ │(LLM)   │ │Check │ │Guide-  │ │esize    │      │
-│   │Data    │ │Differ- │ │OpenFDA│ │lines   │ │(LLM)    │      │
-│   │        │ │ential  │ │RxNorm │ │ChromaDB│ │Report   │      │
-│   └────────┘ └────────┘ └──────┘ └────────┘ └─────────┘      │
-│                                                                  │
-│  External: OpenFDA API │ RxNorm/NLM API │ ChromaDB (local)      │
-└──────────────────────────────────────────────────────────────────┘
+┌──────────────────────────▼──────────────────────────────────────────┐
+│                     BACKEND (FastAPI + Python 3.10)                  │
+│                                                                      │
+│  ┌────────────────────────────────────────────────────────────────┐  │
+│  │                ORCHESTRATOR (6-Step Pipeline)                  │  │
+│  └──┬──────────┬──────────┬──────────┬──────────┬──────────┬─────┘  │
+│  ┌──▼───┐ ┌───▼────┐ ┌──▼───┐ ┌───▼────┐ ┌───▼─────┐ ┌──▼────┐  │
+│  │Parse │ │Reason  │ │ Drug │ │  RAG   │ │Conflict │ │Synth- │  │
+│  │Pati- │ │(LLM)   │ │Check │ │Guide-  │ │Detect-  │ │esize  │  │
+│  │ent   │ │Differ- │ │OpenFDA│ │lines   │ │ion      │ │(LLM)  │  │
+│  │Data  │ │ential  │ │RxNorm │ │ChromaDB│ │(LLM)    │ │Report │  │
+│  └──────┘ └────────┘ └──────┘ └────────┘ └─────────┘ └───────┘  │
+│                                                                      │
+│  External: OpenFDA API │ RxNorm/NLM API │ ChromaDB (local)          │
+└──────────────────────────────────────────────────────────────────────┘
 ```
 
 See [docs/architecture.md](docs/architecture.md) for the full design document.
@@ -136,9 +137,9 @@ medgemma_impact_challenge/
 │   │       ├── config.py             # Pydantic Settings (ports, models, dirs)
 │   │       ├── __init__.py
 │   │       ├── models/
-│   │       │   └── schemas.py        # All Pydantic models (~238 lines)
+│   │       │   └── schemas.py        # All Pydantic models (~280 lines)
 │   │       ├── agent/
-│   │       │   └── orchestrator.py   # 5-step pipeline orchestrator (267 lines)
+│   │       │   └── orchestrator.py   # 6-step pipeline orchestrator (~300 lines)
 │   │       ├── services/
 │   │       │   └── medgemma.py       # LLM service (OpenAI-compatible API)
 │   │       ├── tools/
@@ -146,7 +147,8 @@ medgemma_impact_challenge/
 │   │       │   ├── clinical_reasoning.py  # Step 2: Differential diagnosis
 │   │       │   ├── drug_interactions.py   # Step 3: OpenFDA + RxNorm
 │   │       │   ├── guideline_retrieval.py # Step 4: RAG over ChromaDB
-│   │       │   └── synthesis.py           # Step 5: CDS report generation
+│   │       │   ├── conflict_detection.py  # Step 5: Guideline vs patient conflicts
+│   │       │   └── synthesis.py           # Step 6: CDS report generation
 │   │       ├── data/
 │   │       │   └── clinical_guidelines.json  # 62 guidelines, 14 specialties
 │   │       └── api/
@@ -240,8 +242,8 @@ python test_clinical_cases.py --report results.json  # Save results
 1. Open `http://localhost:3000`
 2. Paste a patient case description (or click a sample case)
 3. Click **"Analyze Patient Case"**
-4. Watch the 5-step agent pipeline execute in real time
-5. Review the CDS report: differential diagnosis, drug warnings, guideline recommendations, next steps
+4. Watch the 6-step agent pipeline execute in real time
+5. Review the CDS report: differential diagnosis, drug warnings, **conflicts & gaps**, guideline recommendations, next steps
 
 ---
 

@@ -65,15 +65,16 @@ Gemma 3 27B IT provides the right balance of capability and accessibility for a 
 
 **How the model is used:**
 
-The model serves as the reasoning engine in a 5-step agentic pipeline:
+The model serves as the reasoning engine in a 6-step agentic pipeline:
 
 1. **Patient Data Parsing** (LLM) — Extracts structured patient data from free-text clinical narratives
 2. **Clinical Reasoning** (LLM) — Generates ranked differential diagnoses with chain-of-thought reasoning
 3. **Drug Interaction Check** (External APIs) — Queries OpenFDA and RxNorm for medication safety
 4. **Guideline Retrieval** (RAG) — Retrieves relevant clinical guidelines from a 62-guideline corpus using ChromaDB
-5. **Synthesis** (LLM) — Integrates all outputs into a comprehensive CDS report
+5. **Conflict Detection** (LLM) — Compares guideline recommendations against patient data to identify omissions, contradictions, dosage concerns, monitoring gaps, allergy risks, and interaction gaps
+6. **Synthesis** (LLM) — Integrates all outputs into a comprehensive CDS report with conflicts prominently featured
 
-The model is used in Steps 1, 2, and 5 — parsing, reasoning, and synthesis. This demonstrates the model used "to its fullest potential" across multiple distinct clinical tasks within a single workflow.
+The model is used in Steps 1, 2, 5, and 6 — parsing, reasoning, conflict detection, and synthesis. This demonstrates the model used "to its fullest potential" across multiple distinct clinical tasks within a single workflow.
 
 ### Technical details
 
@@ -82,12 +83,13 @@ The model is used in Steps 1, 2, and 5 — parsing, reasoning, and synthesis. Th
 ```
 Frontend (Next.js 14)  ←→  Backend (FastAPI + Python 3.10)
                               │
-                    Orchestrator (5-step pipeline)
+                    Orchestrator (6-step pipeline)
                     ├── Step 1: Patient Parser (LLM)
                     ├── Step 2: Clinical Reasoning (LLM)
                     ├── Step 3: Drug Check (OpenFDA + RxNorm APIs)
                     ├── Step 4: Guideline Retrieval (ChromaDB RAG)
-                    └── Step 5: Synthesis (LLM)
+                    ├── Step 5: Conflict Detection (LLM)
+                    └── Step 6: Synthesis (LLM)
 ```
 
 All inter-step data is strongly typed with Pydantic v2 models. The pipeline streams each step's progress to the frontend via WebSocket for real-time visibility.
@@ -100,7 +102,7 @@ No fine-tuning was performed in the current version. The base `gemma-3-27b-it` m
 
 | Test | Result |
 |------|--------|
-| E2E pipeline (chest pain / ACS) | All 5 steps passed, 75 s total |
+| E2E pipeline (chest pain / ACS) | All 6 steps passed, ~75–85 s total |
 | RAG retrieval quality | 30/30 queries passed (100%), avg relevance 0.639 |
 | Clinical test suite | 22 scenarios across 14 specialties |
 | Top-1 RAG accuracy | 100% — correct guideline ranked #1 for all queries |
@@ -127,10 +129,11 @@ No fine-tuning was performed in the current version. The base `gemma-3-27b-it` m
 In a real clinical setting, the system would be used at the point of care:
 1. Clinician opens the CDS Agent interface (embedded in the EHR or as a standalone app)
 2. Patient data is automatically pulled from the EHR (or pasted manually)
-3. The agent pipeline runs in ~60-90 seconds, during which the clinician can continue other tasks
+3. The agent pipeline runs in ~60–90 seconds, during which the clinician can continue other tasks
 4. The CDS report appears with:
    - Ranked differential diagnoses with reasoning chains (transparent AI)
    - Drug interaction warnings with severity levels
+   - **Conflicts & gaps** between guideline recommendations and the patient's actual data — prominently displayed with specific guideline citations, patient data comparisons, and suggested resolutions
    - Relevant clinical guideline excerpts with citations to authoritative sources
    - Suggested next steps (immediate, short-term, long-term)
 5. The clinician reviews the recommendations and incorporates them into their clinical judgment

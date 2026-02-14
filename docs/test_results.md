@@ -60,7 +60,7 @@ python test_rag_quality.py --rebuild --verbose
 ## 2. End-to-End Pipeline Test
 
 **Test file:** `src/backend/test_e2e.py`  
-**What it tests:** Full 5-step agent pipeline from free-text input to synthesized CDS report.  
+**What it tests:** Full 6-step agent pipeline from free-text input to synthesized CDS report.  
 **Test case:** 62-year-old male with crushing substernal chest pain, diaphoresis, nausea, HTN history, on lisinopril + metformin + atorvastatin.
 
 ### Pipeline Step Results
@@ -71,7 +71,8 @@ python test_rag_quality.py --rebuild --verbose
 | 2. Clinical Reasoning | PASSED | 21.2 s | Top differential: Acute Coronary Syndrome (ACS). Also considered: GERD, PE, aortic dissection |
 | 3. Drug Interaction Check | PASSED | 11.3 s | Queried OpenFDA + RxNorm for lisinopril, metformin, atorvastatin interactions |
 | 4. Guideline Retrieval | PASSED | 9.6 s | Retrieved ACC/AHA chest pain / ACS guidelines from RAG corpus |
-| 5. Synthesis | PASSED | 25.3 s | Generated comprehensive CDS report with differential, warnings, guideline recommendations |
+| 5. Conflict Detection | PASSED | — | Compares guidelines against patient data for omissions, contradictions, dosage, monitoring gaps |
+| 6. Synthesis | PASSED | 25.3 s | Generated comprehensive CDS report with differential, warnings, conflicts, guideline recommendations |
 
 **Total pipeline time:** 75.2 s
 
@@ -185,7 +186,7 @@ python test_clinical_cases.py --quiet
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `test_e2e.py` | 57 | Submit chest pain case, poll for completion, validate all 5 steps |
+| `test_e2e.py` | 57 | Submit chest pain case, poll for completion, validate all 6 steps |
 | `test_clinical_cases.py` | ~400 | 22 clinical cases with keyword validation, CLI flags for filtering |
 | `test_rag_quality.py` | ~350 | 30 RAG retrieval queries with expected guideline IDs, relevance scoring |
 | `test_poll.py` | ~30 | Utility: poll a case ID until completion |

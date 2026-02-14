@@ -173,6 +173,54 @@ Rewrote/created all documentation:
 
 ---
 
+## Phase 8: Conflict Detection Feature
+
+### Design Decision: Drop Confidence Scores, Add Conflict Detection
+
+During review, identified that the system's "confidence" was just the LLM picking a label (LOW/MODERATE/HIGH) — not a calibrated score. Composite numeric confidence scores were considered and **rejected** because:
+- Uncalibrated confidence values are dangerous (clinician anchoring bias)
+- No training data exists to calibrate outputs
+- A single number hides more than it reveals
+
+**Instead, added Conflict Detection** — a new pipeline step that compares guideline recommendations against the patient's actual data to identify specific, actionable gaps. This provides direct patient safety value without requiring calibration.
+
+### Implementation
+
+**New models added to `schemas.py`:**
+- `ConflictType` enum — 6 categories: omission, contradiction, dosage, monitoring, allergy_risk, interaction_gap
+- `ClinicalConflict` model — Each conflict has: type, severity, guideline_source, guideline_text, patient_data, description, suggested_resolution
+- `ConflictDetectionResult` — List of conflicts + summary + guidelines_checked count
+- `conflicts` field added to `CDSReport`
+- `conflict_detection` field added to `AgentState`
+
+**New tool: `conflict_detection.py`:**
+- Takes patient profile, clinical reasoning, drug interactions, and guidelines
+- Uses MedGemma at low temperature (0.1) for safety-critical analysis
+- Returns structured `ConflictDetectionResult` with specific, actionable conflicts
+- Graceful degradation: returns empty if no guidelines available
+
+**Pipeline changes (`orchestrator.py`):**
+- Pipeline expanded from 5 to 6 steps
+- New Step 5: Conflict Detection (between guideline retrieval and synthesis)
+- Synthesis (now Step 6) receives conflict data and prominently includes it in the report
+
+**Synthesis changes (`synthesis.py`):**
+- Accepts `conflict_detection` parameter
+- New "Conflicts & Gaps" section in synthesis prompt
+- Fallback: copies detected conflicts directly into report if LLM doesn't populate the structured field
+
+**Frontend changes (`CDSReport.tsx`):**
+- New "Conflicts & Gaps Detected" section with high visual prominence
+- Red border container, severity-coded left-accent cards (critical=red, high=orange, moderate=yellow, low=blue)
+- Side-by-side "Guideline says" vs "Patient data" comparison
+- Green-highlighted suggested resolutions
+- Positioned immediately after drug interactions for maximum visibility
+
+**Files created:** `src/backend/app/tools/conflict_detection.py` (1 new file)
+**Files modified:** `schemas.py`, `orchestrator.py`, `synthesis.py`, `CDSReport.tsx` (4 files)
+
+---
+
 ## Dependency Inventory
 
 ### Python Backend (`requirements.txt`)

@@ -29,19 +29,19 @@ structured clinical decision support report — all in seconds.
 │                  BACKEND (FastAPI + Python 3.10)                 │
 │  Port 8000 (default) / 8002 (dev)                               │
 │                                                                  │
-│  ┌────────────────────────────────────────────────────────────┐  │
-│  │            ORCHESTRATOR (orchestrator.py, 267 lines)       │  │
-│  │  Sequential 5-step pipeline with structured state passing  │  │
-│  └─────┬──────────┬──────────┬──────────┬──────────┬─────────┘  │
-│        │          │          │          │          │              │
-│   ┌────▼───┐ ┌───▼────┐ ┌──▼───┐ ┌───▼────┐ ┌───▼─────┐      │
-│   │Step 1  │ │Step 2  │ │Step 3 │ │Step 4  │ │Step 5   │      │
-│   │Patient │ │Clinical│ │Drug   │ │Guide-  │ │Synthe-  │      │
-│   │Parser  │ │Reason- │ │Inter- │ │line    │ │sis      │      │
-│   │        │ │ing     │ │action │ │Retriev-│ │Agent    │      │
-│   │(LLM)   │ │(LLM)   │ │(APIs) │ │al(RAG) │ │(LLM)    │      │
-│   └────────┘ └────────┘ └──┬───┘ └──┬─────┘ └─────────┘      │
-│                             │        │                           │
+│  ┌────────────────────────────────────────────────────────────────────┐  │
+│  │            ORCHESTRATOR (orchestrator.py, ~300 lines)              │  │
+│  │  Sequential 6-step pipeline with structured state passing         │  │
+│  └──┬──────────┬──────────┬──────────┬──────────┬──────────┬────────┘  │
+│     │          │          │          │          │          │            │
+│  ┌──▼───┐ ┌───▼────┐ ┌──▼───┐ ┌───▼────┐ ┌───▼─────┐ ┌──▼──────┐   │
+│  │Step 1│ │Step 2  │ │Step 3│ │Step 4  │ │Step 5   │ │Step 6   │   │
+│  │Pati- │ │Clini-  │ │Drug  │ │Guide-  │ │Conflict │ │Synthe-  │   │
+│  │ent   │ │cal     │ │Inter-│ │line    │ │Detect-  │ │sis      │   │
+│  │Parser│ │Reason- │ │action│ │Retriev-│ │ion      │ │Agent    │   │
+│  │(LLM) │ │ing     │ │(APIs)│ │al(RAG) │ │(LLM)    │ │(LLM)    │   │
+│  └──────┘ │(LLM)   │ └──┬──┘ └──┬─────┘ └─────────┘ └─────────┘   │
+│           └────────┘    │       │                                    │
 │                        ┌────▼────┐ ┌─▼──────────────┐           │
 │                        │OpenFDA  │ │ChromaDB         │           │
 │                        │RxNorm   │ │62 guidelines    │           │
@@ -100,20 +100,37 @@ LLM: gemma-3-27b-it via Google AI Studio
   - **Fallback:** If `clinical_guidelines.json` is missing, falls back to 2 minimal embedded guidelines
 - **Timing:** ~9.6 s (observed)
 
-### Step 5: Synthesis Agent (`synthesis.py`)
+### Step 5: Conflict Detection (`conflict_detection.py`)
 
-- **Input:** All outputs from Steps 1–4
+- **Input:** Patient profile, clinical reasoning, drug interactions, and retrieved guidelines from Steps 1–4
+- **Output:** `ConflictDetectionResult` with specific `ClinicalConflict` items
+- **Method:** LLM-based comparison of guideline recommendations against the patient's actual data
+- **Conflict types detected:**
+  - **Omission** — Guideline recommends something the patient is not receiving
+  - **Contradiction** — Patient's current treatment conflicts with guideline advice
+  - **Dosage** — Guideline specifies dose adjustments that apply to this patient (age, renal function, etc.)
+  - **Monitoring** — Guideline requires monitoring that is not documented as ordered
+  - **Allergy Risk** — Guideline-recommended treatment involves a medication the patient is allergic to
+  - **Interaction Gap** — Known drug interaction is not addressed in the care plan
+- **Each conflict includes:** severity (critical/high/moderate/low), guideline source, guideline text, patient data, description, and suggested resolution
+- **Temperature:** 0.1 (low, for safety-critical analysis)
+- **Graceful degradation:** Returns empty result if no guidelines were retrieved (Step 4 skipped/failed)
+
+### Step 6: Synthesis Agent (`synthesis.py`)
+
+- **Input:** All outputs from Steps 1–4 plus conflict detection results
 - **Output:** `CDSReport` (comprehensive structured report)
 - **Report sections:**
   - Patient summary
   - Differential diagnosis with reasoning chains
   - Drug interaction warnings with severity
+  - **Conflicts & gaps** — prominently featured with guideline vs patient data comparison
   - Guideline-concordant recommendations with citations
   - Suggested next steps (immediate, short-term, long-term)
-  - Confidence levels and caveats
+  - Caveats and limitations
 - **Timing:** ~25.3 s (observed)
 
-**Total pipeline time:** ~75 s for a complex case (all 5 steps sequential).
+**Total pipeline time:** ~75–85 s for a complex case (6 steps, with Steps 3–4 parallel).
 
 ---
 
@@ -148,7 +165,7 @@ This preserves the intended behavior while staying compatible with Gemma's API c
 
 ## Data Models (Pydantic v2)
 
-All pipeline data is strongly typed via Pydantic models in `schemas.py` (~238 lines):
+All pipeline data is strongly typed via Pydantic models in `schemas.py` (~280 lines):
 
 | Model | Purpose |
 |-------|---------|
@@ -160,7 +177,10 @@ All pipeline data is strongly typed via Pydantic models in `schemas.py` (~238 li
 | `DrugInteractionResult` | Step 3 output: all interaction data |
 | `GuidelineExcerpt` | Individual guideline citation |
 | `GuidelineRetrievalResult` | Step 4 output: relevant guidelines |
-| `CDSReport` | Step 5 output: full synthesized report |
+| `ConflictType` | Enum: omission, contradiction, dosage, monitoring, allergy_risk, interaction_gap |
+| `ClinicalConflict` | Individual conflict: guideline_text vs patient_data + suggested resolution |
+| `ConflictDetectionResult` | Step 5 output: all detected conflicts |
+| `CDSReport` | Step 6 output: full synthesized report (now includes conflicts) |
 | `AgentStep` | WebSocket message: step name, status, data, timing |
 
 ---
@@ -178,8 +198,8 @@ All pipeline data is strongly typed via Pydantic models in `schemas.py` (~238 li
 | Component | Role |
 |-----------|------|
 | `PatientInput.tsx` | Text area for patient case + 3 pre-loaded sample cases (chest pain, DKA, pediatric fever) |
-| `AgentPipeline.tsx` | Visualizes the 5-step pipeline in real time — shows status (pending / running / complete / error) for each step as WebSocket messages arrive |
-| `CDSReport.tsx` | Renders the final CDS report: patient summary, differentials, drug warnings, guidelines, next steps |
+| `AgentPipeline.tsx` | Visualizes the 6-step pipeline in real time — shows status (pending / running / complete / error) for each step as WebSocket messages arrive |
+| `CDSReport.tsx` | Renders the final CDS report: patient summary, differentials, drug warnings, **conflicts & gaps** (prominently styled), guidelines, next steps |
 
 ### Communication
 
@@ -215,8 +235,8 @@ All pipeline data is strongly typed via Pydantic models in `schemas.py` (~238 li
 
 | Characteristic | Chatbot | This Agent System |
 |----------------|---------|-------------------|
-| Tool use | None | 4+ specialized tools (parser, drug API, RAG, synthesis) |
-| Planning | None | Orchestrator executes a defined 5-step plan |
+| Tool use | None | 5+ specialized tools (parser, drug API, RAG, conflict detection, synthesis) |
+| Planning | None | Orchestrator executes a defined 6-step plan |
 | State management | Stateless | Patient context flows through all steps |
 | Error handling | Generic | Tool-specific fallbacks, graceful degradation |
 | Output structure | Free text | Pydantic-validated, structured, cited |
