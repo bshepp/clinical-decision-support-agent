@@ -13,6 +13,7 @@ from typing import Optional
 from app.models.schemas import (
     CDSReport,
     ClinicalReasoningResult,
+    ConflictDetectionResult,
     DrugInteractionResult,
     GuidelineRetrievalResult,
     PatientProfile,
@@ -48,14 +49,20 @@ Clinical Decision Support report.
 ═══ CLINICAL GUIDELINES ═══
 {guidelines}
 
+═══ CONFLICTS & GAPS DETECTED ═══
+{conflicts}
+
 Create a comprehensive CDS report including:
 1. Patient Summary — concise summary of the case
 2. Differential Diagnosis — ranked with reasoning, integrating guideline concordance
 3. Drug Interaction Warnings — any flagged interactions with clinical significance
 4. Guideline-Concordant Recommendations — actionable steps aligned with guidelines
-5. Suggested Next Steps — prioritized actions for the clinician
-6. Caveats — limitations, uncertainties, and important disclaimers
-7. Sources — cited guidelines and data sources used"""
+5. Conflicts & Gaps — PROMINENTLY include every detected conflict. For each conflict,
+   state what the guideline recommends, what the patient's current state is, and the
+   suggested resolution. This section is CRITICAL for patient safety.
+6. Suggested Next Steps — prioritized actions for the clinician, incorporating conflict resolutions
+7. Caveats — limitations, uncertainties, and important disclaimers
+8. Sources — cited guidelines and data sources used"""
 
 
 class SynthesisTool:
@@ -70,6 +77,7 @@ class SynthesisTool:
         clinical_reasoning: Optional[ClinicalReasoningResult],
         drug_interactions: Optional[DrugInteractionResult],
         guideline_retrieval: Optional[GuidelineRetrievalResult],
+        conflict_detection: Optional[ConflictDetectionResult] = None,
     ) -> CDSReport:
         """
         Synthesize all available tool outputs into a final CDS report.
@@ -88,6 +96,7 @@ class SynthesisTool:
             clinical_reasoning=self._format_reasoning(clinical_reasoning),
             drug_interactions=self._format_interactions(drug_interactions),
             guidelines=self._format_guidelines(guideline_retrieval),
+            conflicts=self._format_conflicts(conflict_detection),
         )
 
         report = await self.medgemma.generate_structured(
@@ -104,6 +113,12 @@ class SynthesisTool:
             "It does not replace professional medical judgment. All recommendations should "
             "be verified by a qualified clinician before acting on them."
         )
+
+        # Ensure detected conflicts are always surfaced even if LLM doesn't
+        # populate the conflicts field in its structured output
+        if conflict_detection and conflict_detection.conflicts:
+            if not report.conflicts:
+                report.conflicts = conflict_detection.conflicts
 
         logger.info("Synthesis complete — CDS report generated")
         return report
@@ -177,4 +192,23 @@ class SynthesisTool:
             score = f" (relevance: {excerpt.relevance_score})" if excerpt.relevance_score else ""
             parts.append(f"  [{excerpt.source}] {excerpt.title}{score}")
             parts.append(f"    {excerpt.excerpt[:300]}...")
+        return "\n".join(parts)
+
+    @staticmethod
+    def _format_conflicts(conflicts: Optional[ConflictDetectionResult]) -> str:
+        if not conflicts or not conflicts.conflicts:
+            return "No conflicts detected between guidelines and patient data"
+        parts = [
+            f"{len(conflicts.conflicts)} conflict(s) detected "
+            f"across {conflicts.guidelines_checked} guidelines:"
+        ]
+        for i, c in enumerate(conflicts.conflicts, 1):
+            parts.append(
+                f"\n  {i}. [{c.severity.value.upper()}] {c.conflict_type.value.upper()}"
+            )
+            parts.append(f"     Guideline ({c.guideline_source}): {c.guideline_text}")
+            parts.append(f"     Patient data: {c.patient_data}")
+            parts.append(f"     Issue: {c.description}")
+            if c.suggested_resolution:
+                parts.append(f"     Suggested resolution: {c.suggested_resolution}")
         return "\n".join(parts)

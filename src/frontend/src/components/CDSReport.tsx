@@ -14,6 +14,15 @@ interface Report {
     severity: string;
     description: string;
   }>;
+  conflicts: Array<{
+    conflict_type: string;
+    severity: string;
+    guideline_source: string;
+    guideline_text: string;
+    patient_data: string;
+    description: string;
+    suggested_resolution?: string;
+  }>;
   guideline_recommendations: string[];
   suggested_next_steps: Array<{
     action: string;
@@ -39,6 +48,38 @@ const LIKELIHOOD_BADGE: Record<string, string> = {
   high: "bg-red-100 text-red-700",
   moderate: "bg-yellow-100 text-yellow-700",
   low: "bg-gray-100 text-gray-600",
+};
+
+const CONFLICT_TYPE_LABEL: Record<string, string> = {
+  omission: "Omission",
+  contradiction: "Contradiction",
+  dosage: "Dosage Concern",
+  monitoring: "Monitoring Gap",
+  allergy_risk: "Allergy Risk",
+  interaction_gap: "Interaction Gap",
+};
+
+const CONFLICT_SEVERITY_STYLE: Record<string, { bg: string; border: string; icon: string }> = {
+  critical: {
+    bg: "bg-red-50",
+    border: "border-red-400",
+    icon: "🔴",
+  },
+  high: {
+    bg: "bg-orange-50",
+    border: "border-orange-400",
+    icon: "🟠",
+  },
+  moderate: {
+    bg: "bg-yellow-50",
+    border: "border-yellow-400",
+    icon: "🟡",
+  },
+  low: {
+    bg: "bg-blue-50",
+    border: "border-blue-300",
+    icon: "🔵",
+  },
 };
 
 export function CDSReport({ report }: CDSReportProps) {
@@ -122,6 +163,81 @@ export function CDSReport({ report }: CDSReportProps) {
             ))}
           </div>
         </Section>
+      )}
+
+      {/* Conflicts & Gaps — PROMINENTLY displayed */}
+      {report.conflicts && report.conflicts.length > 0 && (
+        <div className="bg-white rounded-xl border-2 border-red-300 p-5 ring-1 ring-red-100">
+          <div className="flex items-center gap-2 mb-4">
+            <span className="text-xl">🚨</span>
+            <h3 className="text-base font-bold text-red-800">
+              Conflicts &amp; Gaps Detected ({report.conflicts.length})
+            </h3>
+          </div>
+          <p className="text-xs text-red-600 mb-4">
+            The following conflicts were identified between clinical guideline
+            recommendations and this patient&apos;s current data. Review each item
+            carefully.
+          </p>
+          <div className="space-y-3">
+            {report.conflicts.map((conflict, i) => {
+              const style =
+                CONFLICT_SEVERITY_STYLE[conflict.severity] ||
+                CONFLICT_SEVERITY_STYLE.moderate;
+              return (
+                <div
+                  key={i}
+                  className={`p-4 rounded-lg border-l-4 ${style.bg} ${style.border}`}
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <span>{style.icon}</span>
+                    <span className="text-xs font-bold uppercase text-gray-500">
+                      {CONFLICT_TYPE_LABEL[conflict.conflict_type] ||
+                        conflict.conflict_type}
+                    </span>
+                    <span className="text-xs font-semibold uppercase px-2 py-0.5 rounded bg-white/60">
+                      {conflict.severity}
+                    </span>
+                  </div>
+                  <p className="text-sm font-medium text-gray-800 mb-2">
+                    {conflict.description}
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                    <div className="bg-white/50 rounded p-2">
+                      <span className="font-semibold text-gray-500 block mb-0.5">
+                        Guideline says:
+                      </span>
+                      <span className="text-gray-700">
+                        {conflict.guideline_text}
+                      </span>
+                      <span className="block text-gray-400 mt-1">
+                        — {conflict.guideline_source}
+                      </span>
+                    </div>
+                    <div className="bg-white/50 rounded p-2">
+                      <span className="font-semibold text-gray-500 block mb-0.5">
+                        Patient data:
+                      </span>
+                      <span className="text-gray-700">
+                        {conflict.patient_data}
+                      </span>
+                    </div>
+                  </div>
+                  {conflict.suggested_resolution && (
+                    <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded text-xs">
+                      <span className="font-semibold text-green-700">
+                        Suggested resolution:{" "}
+                      </span>
+                      <span className="text-green-800">
+                        {conflict.suggested_resolution}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
       )}
 
       {/* Guideline Recommendations */}

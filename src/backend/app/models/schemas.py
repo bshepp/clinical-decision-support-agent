@@ -156,6 +156,39 @@ class GuidelineRetrievalResult(BaseModel):
 
 
 # ──────────────────────────────────────────────
+# Conflict Detection Models
+# ──────────────────────────────────────────────
+
+class ConflictType(str, Enum):
+    OMISSION = "omission"                # Guideline recommends X, patient not receiving X
+    CONTRADICTION = "contradiction"      # Patient's current care contradicts guideline
+    DOSAGE = "dosage"                    # Dose adjustment criteria apply to this patient
+    MONITORING = "monitoring"            # Required monitoring not documented/ordered
+    ALLERGY_RISK = "allergy_risk"        # Guideline suggests drug patient is allergic to
+    INTERACTION_GAP = "interaction_gap"  # Drug interaction not addressed in current plan
+
+
+class ClinicalConflict(BaseModel):
+    """A single detected conflict between guidelines and patient data."""
+    conflict_type: ConflictType = Field(..., description="Category of the conflict")
+    severity: Severity = Field(..., description="Potential clinical impact")
+    guideline_source: str = Field(..., description="Which guideline flagged this")
+    guideline_text: str = Field(..., description="What the guideline recommends")
+    patient_data: str = Field(..., description="Relevant patient data that conflicts")
+    description: str = Field(..., description="Plain-language explanation of the gap")
+    suggested_resolution: Optional[str] = Field(
+        None, description="Potential resolution for the clinician to consider"
+    )
+
+
+class ConflictDetectionResult(BaseModel):
+    """Output of the Conflict Detection tool."""
+    conflicts: List[ClinicalConflict] = Field(default_factory=list)
+    guidelines_checked: int = Field(0, description="Number of guidelines compared")
+    summary: str = Field("", description="Brief summary of conflict analysis")
+
+
+# ──────────────────────────────────────────────
 # Final CDS Report
 # ──────────────────────────────────────────────
 
@@ -174,6 +207,10 @@ class CDSReport(BaseModel):
     caveats: List[str] = Field(
         default_factory=list,
         description="Limitations, uncertainties, and disclaimers"
+    )
+    conflicts: List[ClinicalConflict] = Field(
+        default_factory=list,
+        description="Detected conflicts between guidelines and patient care"
     )
     sources_cited: List[str] = Field(default_factory=list)
     generated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -203,6 +240,7 @@ class AgentState(BaseModel):
     clinical_reasoning: Optional[ClinicalReasoningResult] = None
     drug_interactions: Optional[DrugInteractionResult] = None
     guideline_retrieval: Optional[GuidelineRetrievalResult] = None
+    conflict_detection: Optional[ConflictDetectionResult] = None
     final_report: Optional[CDSReport] = None
     started_at: Optional[datetime] = None
     completed_at: Optional[datetime] = None

@@ -30,6 +30,7 @@ from app.tools.patient_parser import PatientParserTool
 from app.tools.clinical_reasoning import ClinicalReasoningTool
 from app.tools.drug_interactions import DrugInteractionTool
 from app.tools.guideline_retrieval import GuidelineRetrievalTool
+from app.tools.conflict_detection import ConflictDetectionTool
 from app.tools.synthesis import SynthesisTool
 
 
@@ -55,6 +56,7 @@ class Orchestrator:
         self.clinical_reasoning = ClinicalReasoningTool()
         self.drug_interaction = DrugInteractionTool()
         self.guideline_retrieval = GuidelineRetrievalTool()
+        self.conflict_detection = ConflictDetectionTool()
         self.synthesis = SynthesisTool()
 
         # State
@@ -92,6 +94,14 @@ class Orchestrator:
                     step_id="guidelines",
                     step_name="Guideline Retrieval",
                     tool_name="guideline_retrieval",
+                )
+            )
+        if case.include_guidelines:
+            steps.append(
+                AgentStep(
+                    step_id="conflicts",
+                    step_name="Conflict Detection",
+                    tool_name="conflict_detection",
                 )
             )
         steps.append(
@@ -146,7 +156,11 @@ class Orchestrator:
                     else:
                         yield result
 
-            # ── Step 5: Synthesis ──
+            # ── Step 5: Conflict Detection ──
+            if case.include_guidelines:
+                yield await self._run_step("conflicts", self._step_conflict_detection)
+
+            # ── Step 6: Synthesis ──
             yield await self._run_step("synthesize", self._step_synthesize)
 
             self._state.completed_at = datetime.utcnow()
@@ -246,13 +260,31 @@ class Orchestrator:
         step = self._get_step("guidelines")
         step.output_summary = f"{len(result.excerpts)} guideline excerpts retrieved"
 
+    async def _step_conflict_detection(self):
+        """Step 5: Detect conflicts between guidelines and patient data."""
+        result = await self.conflict_detection.run(
+            patient_profile=self._state.patient_profile,
+            clinical_reasoning=self._state.clinical_reasoning,
+            drug_interactions=self._state.drug_interactions,
+            guideline_retrieval=self._state.guideline_retrieval,
+        )
+        self._state.conflict_detection = result
+
+        step = self._get_step("conflicts")
+        n = len(result.conflicts)
+        if n == 0:
+            step.output_summary = "No conflicts detected"
+        else:
+            step.output_summary = f"{n} conflict(s) detected — {result.summary}"
+
     async def _step_synthesize(self):
-        """Step 5: Synthesize all tool outputs into a final CDS report."""
+        """Step 6: Synthesize all tool outputs into a final CDS report."""
         report = await self.synthesis.run(
             patient_profile=self._state.patient_profile,
             clinical_reasoning=self._state.clinical_reasoning,
             drug_interactions=self._state.drug_interactions,
             guideline_retrieval=self._state.guideline_retrieval,
+            conflict_detection=self._state.conflict_detection,
         )
         self._state.final_report = report
 
