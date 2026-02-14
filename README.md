@@ -322,13 +322,17 @@ curl -X POST http://localhost:8000/api/cases/submit \
 | [docs/test_results.md](docs/test_results.md) | Detailed test results, RAG benchmarks, pipeline timing |
 | [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) | Chronological build history, problems solved, decisions made |
 | [docs/writeup_draft.md](docs/writeup_draft.md) | Project writeup / summary |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute to the project |
+| [SECURITY.md](SECURITY.md) | Security policy and responsible disclosure |
+| [TODO.md](TODO.md) | Next-session action items and project state |
 | [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md) | Competition submission strategy |
-| [RULES_SUMMARY.md](RULES_SUMMARY.md) | Competition rules checklist |
 
 ---
 
 ## License
 
-Subject to [HAI-DEF Terms of Use](https://developers.google.com/health-ai-developer-foundations/terms) for model usage.
+Licensed under the [Apache License 2.0](LICENSE).
+
+This project uses the Gemma model, which is subject to the [HAI-DEF Terms of Use](https://developers.google.com/health-ai-developer-foundations/terms).
 
 > **Disclaimer:** This is a research / demonstration system. It is NOT a substitute for professional medical judgment. All clinical decisions must be made by qualified healthcare professionals.
