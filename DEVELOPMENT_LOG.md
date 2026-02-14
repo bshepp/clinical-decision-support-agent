@@ -155,7 +155,7 @@ Created `test_clinical_cases.py` with 22 diverse clinical scenarios:
 
 ---
 
-## Phase 7: Documentation (Current)
+## Phase 7: Documentation
 
 Performed comprehensive documentation audit. Found:
 - README was outdated (wrong port, missing test info, incomplete structure tree)
@@ -265,3 +265,65 @@ All config via `.env` (template in `.env.template`):
 | `EMBEDDING_MODEL` | No | `sentence-transformers/all-MiniLM-L6-v2` | RAG embeddings |
 | `MAX_GUIDELINES` | No | `5` | Guidelines per RAG query |
 | `AGENT_TIMEOUT` | No | `120` | Pipeline timeout (seconds) |
+
+---
+
+## Phase 9: External Dataset Validation Framework
+
+### Motivation
+
+Internal tests (RAG quality, clinical cases) are useful but don't measure diagnostic accuracy against ground truth. Added a validation framework to test the full pipeline against real-world clinical datasets with known correct answers.
+
+### Datasets Evaluated
+
+| Dataset | Source | What It Tests |
+|---------|--------|---------------|
+| **MedQA (USMLE)** | HuggingFace — `GBaker/MedQA-USMLE-4-options` | Diagnostic accuracy (1,273 USMLE-style questions with verified answers) |
+| **MTSamples** | GitHub — `socd06/medical-nlp` | Parse quality & field completeness on real medical transcription notes |
+| **PMC Case Reports** | PubMed E-utilities (esearch + efetch) | Diagnostic accuracy on published case reports with known diagnoses |
+
+### Architecture
+
+Created `src/backend/validation/` package:
+
+- **`base.py`** — Core framework: `ValidationCase`, `ValidationResult`, `ValidationSummary` dataclasses. `run_cds_pipeline()` invokes the Orchestrator directly (no HTTP server needed). Includes `fuzzy_match()` token-overlap scorer and `diagnosis_in_differential()` checker.
+- **`harness_medqa.py`** — Downloads JSONL from HuggingFace, extracts clinical vignettes (strips question stems), scores top-1/top-3/mentioned diagnostic accuracy.
+- **`harness_mtsamples.py`** — Downloads CSV, filters to relevant specialties, stratified sampling. Scores parse success, field completeness, specialty alignment, has_differential, has_recommendations.
+- **`harness_pmc.py`** — Uses NCBI E-utilities with 20 curated queries across specialties. Extracts diagnosis from article titles via regex patterns. Scores diagnostic accuracy.
+- **`run_validation.py`** — Unified CLI: `python -m validation.run_validation --all --max-cases 10`. Supports `--fetch-only`, `--no-drugs`, `--no-guidelines`, `--seed`, `--delay`.
+
+### Problems Solved
+
+1. **MedQA URL 404:** Original GitHub raw URL was stale. Fixed to HuggingFace direct download.
+2. **MTSamples URL 404:** Original mirror was down. Found working mirror at `socd06/medical-nlp`.
+3. **PMC fetcher returned 0 cases:** PubMed API worked, but title regex patterns didn't match common formats like "X: A Case Report." Added 3 new title patterns and fixed query-based fallback extraction.
+4. **`datetime.utcnow()` deprecation:** Replaced with `datetime.now(timezone.utc)` throughout.
+5. **Pipeline time display bug:** `print_summary` showed time metrics as percentages. Fixed by reordering type checks.
+
+### Initial Results (Smoke Test)
+
+Ran 3 MedQA cases through the full pipeline:
+- **Parse success:** 100% (3/3)
+- **Top-1 diagnostic accuracy:** 66.7% (2/3)
+- **Avg pipeline time:** ~94 seconds per case
+
+Full validation runs (50–100+ cases) are planned for the next session.
+
+**Files created:** `validation/__init__.py`, `validation/base.py`, `validation/harness_medqa.py`, `validation/harness_mtsamples.py`, `validation/harness_pmc.py`, `validation/run_validation.py`  
+**Files modified:** `.gitignore` (added `validation/data/` and `validation/results/`)
+
+---
+
+## Phase 10: Final Documentation Audit & Cleanup
+
+Performed a full accuracy audit of all 5 documentation files and `test_e2e.py`.
+
+**Issues found and fixed:**
+- README.md: step count said "5" in E2E table (fixed to 6), missing Conflict Detection row, missing `validation/` in project structure, missing validation section and test commands
+- architecture.md: Design Decision #1 said "5-step" (fixed to 6), Decision #4 said "Gemma in two roles" (fixed to four), no validation framework section
+- test_results.md: no external validation section, stale line count for test_e2e.py
+- DEVELOPMENT_LOG.md: Phase 7 said "(Current)", missing Phase 9 for validation framework
+- writeup_draft.md: referenced "confidence levels" (removed earlier), placeholder links, no validation methodology
+- test_e2e.py: no assertions on step count or conflict_detection step
+
+**Created:** `TODO.md` in project root with next-session action items for easy pickup by future contributors or AI instances.

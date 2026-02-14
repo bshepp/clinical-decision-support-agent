@@ -55,7 +55,7 @@ See [docs/architecture.md](docs/architecture.md) for the full design document.
 
 ### Full Pipeline E2E Test (Chest Pain / ACS Case)
 
-All 5 pipeline steps completed successfully:
+All 6 pipeline steps completed successfully:
 
 | Step | Duration | Result |
 |------|----------|--------|
@@ -63,6 +63,7 @@ All 5 pipeline steps completed successfully:
 | Clinical Reasoning | 21.2 s | ACS correctly identified as top differential |
 | Drug Interaction Check | 11.3 s | Interactions queried against OpenFDA / RxNorm |
 | Guideline Retrieval (RAG) | 9.6 s | Relevant cardiology guidelines retrieved |
+| Conflict Detection | ~5 s | Guideline vs patient data comparison for omissions, contradictions, monitoring gaps |
 | Synthesis | 25.3 s | Comprehensive CDS report generated |
 
 ### RAG Retrieval Quality Test
@@ -83,6 +84,20 @@ Full results: [docs/test_results.md](docs/test_results.md)
 ### Clinical Test Suite
 
 22 comprehensive clinical scenarios covering: ACS, AFib, heart failure, stroke, sepsis, anaphylaxis, polytrauma, DKA, thyroid storm, adrenal crisis, massive PE, status asthmaticus, GI bleeding, pancreatitis, status epilepticus, meningitis, suicidal ideation, neonatal fever, pediatric dehydration, hyperkalemia, acetaminophen overdose, and elderly polypharmacy with falls.
+
+### External Dataset Validation
+
+A validation framework tests the pipeline against real-world clinical datasets:
+
+| Dataset | Source | Cases Available | What It Tests |
+|---------|--------|-----------------|---------------|
+| **MedQA (USMLE)** | HuggingFace | 1,273 | Diagnostic accuracy — does the top differential match the correct answer? |
+| **MTSamples** | GitHub | ~5,000 | Parse quality & field completeness on real transcription notes |
+| **PMC Case Reports** | PubMed E-utilities | Dynamic | Diagnostic accuracy on published case reports with known diagnoses |
+
+Initial smoke test (3 MedQA cases): 100% parse success, 66.7% top-1 diagnostic accuracy.
+
+See [docs/test_results.md](docs/test_results.md) for full details and reproduction steps.
 
 ---
 
@@ -132,6 +147,12 @@ medgemma_impact_challenge/
 │   │   ├── test_clinical_cases.py    # 22 clinical scenario test suite
 │   │   ├── test_rag_quality.py       # RAG retrieval quality tests (30 queries)
 │   │   ├── test_poll.py              # Simple case poller utility
+│   │   ├── validation/               # External dataset validation framework
+│   │   │   ├── base.py               # Core framework (runners, scorers, utilities)
+│   │   │   ├── harness_medqa.py      # MedQA (USMLE) diagnostic accuracy harness
+│   │   │   ├── harness_mtsamples.py  # MTSamples parse quality harness
+│   │   │   ├── harness_pmc.py        # PMC Case Reports diagnostic harness
+│   │   │   └── run_validation.py     # Unified CLI runner
 │   │   └── app/
 │   │       ├── main.py               # FastAPI entry (CORS, routers, lifespan)
 │   │       ├── config.py             # Pydantic Settings (ports, models, dirs)
@@ -235,6 +256,13 @@ python test_clinical_cases.py --case em_sepsis    # Run one case
 python test_clinical_cases.py --specialty Cardio   # Run by specialty
 python test_clinical_cases.py                      # Run all cases
 python test_clinical_cases.py --report results.json  # Save results
+
+# External dataset validation (no backend needed — calls orchestrator directly)
+python -m validation.run_validation --fetch-only          # Download datasets only
+python -m validation.run_validation --medqa --max-cases 5  # 5 MedQA cases
+python -m validation.run_validation --mtsamples --max-cases 5
+python -m validation.run_validation --pmc --max-cases 5
+python -m validation.run_validation --all --max-cases 10   # All 3 datasets
 ```
 
 ### Usage
@@ -257,6 +285,7 @@ python test_clinical_cases.py --report results.json  # Save results
 | RAG | ChromaDB, sentence-transformers (all-MiniLM-L6-v2) | Clinical guideline retrieval |
 | Drug Data | OpenFDA API, RxNorm / NLM API | Drug interactions, medication normalization |
 | Validation | Pydantic | Structured output validation across all pipeline steps |
+| External Validation | MedQA, MTSamples, PMC Case Reports | Diagnostic accuracy & parse quality benchmarking |
 
 ---
 

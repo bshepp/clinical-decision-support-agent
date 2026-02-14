@@ -186,7 +186,7 @@ python test_clinical_cases.py --quiet
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `test_e2e.py` | 57 | Submit chest pain case, poll for completion, validate all 6 steps |
+| `test_e2e.py` | ~60 | Submit chest pain case, poll for completion, validate all 6 steps |
 | `test_clinical_cases.py` | ~400 | 22 clinical cases with keyword validation, CLI flags for filtering |
 | `test_rag_quality.py` | ~350 | 30 RAG retrieval queries with expected guideline IDs, relevance scoring |
 | `test_poll.py` | ~30 | Utility: poll a case ID until completion |
@@ -194,3 +194,60 @@ python test_clinical_cases.py --quiet
 ### Dependencies for Testing
 
 Tests use only the standard library + `httpx` (for REST calls) and the backend's own modules (for RAG tests). No additional test frameworks required beyond what's in `requirements.txt`.
+
+---
+
+## 6. External Dataset Validation
+
+**Test files:** `src/backend/validation/` (package)  
+**What it tests:** Full pipeline diagnostic accuracy and parse quality against real-world clinical datasets.  
+**Methodology:** Each harness fetches a public dataset, converts cases into patient narratives, runs them through the `Orchestrator` directly (no HTTP server), and scores the output against known ground truth.
+
+### Datasets
+
+| Dataset | Source | Cases Available | Metrics |
+|---------|--------|-----------------|--------|
+| **MedQA (USMLE)** | HuggingFace (`GBaker/MedQA-USMLE-4-options`) | 1,273 test cases | top-1, top-3, mentioned diagnostic accuracy |
+| **MTSamples** | GitHub (`socd06/medical-nlp`) | ~5,000 transcription notes | parse success, field completeness, specialty alignment |
+| **PMC Case Reports** | PubMed E-utilities (esearch + efetch) | Dynamic (curated queries) | diagnostic accuracy vs published diagnosis |
+
+### Initial Results (Smoke Test — 3 MedQA Cases)
+
+| Metric | Value |
+|--------|-------|
+| Cases run | 3 |
+| Parse success | 100% (3/3) |
+| Top-1 diagnostic accuracy | 66.7% (2/3) |
+| Top-3 diagnostic accuracy | 66.7% (2/3) |
+| Avg pipeline time | ~94 s per case |
+
+> **Note:** This is a smoke test only. A full validation run (50–100 cases per dataset) is planned but takes ~45 min per dataset.
+
+### How to Reproduce
+
+```bash
+cd src/backend
+
+# Fetch datasets only (no pipeline runs)
+python -m validation.run_validation --fetch-only
+
+# Run MedQA validation (N cases)
+python -m validation.run_validation --medqa --max-cases 10
+
+# Run MTSamples validation
+python -m validation.run_validation --mtsamples --max-cases 10
+
+# Run PMC Case Reports validation
+python -m validation.run_validation --pmc --max-cases 5
+
+# Run all 3 datasets
+python -m validation.run_validation --all --max-cases 10
+
+# Additional flags:
+#   --seed 42          Reproducible random sampling
+#   --delay 2          Seconds between cases (rate limiting)
+#   --no-drugs         Skip drug interaction step
+#   --no-guidelines    Skip guideline retrieval step
+```
+
+Results are saved to `validation/results/` as timestamped JSON files.

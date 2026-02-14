@@ -50,6 +50,28 @@ async def main():
             dur = s.get("duration_ms", "?")
             print(f"  {s['step_id']:12s} {s['status']:10s} ({dur}ms) {err[:100] if err else 'OK'}")
 
+        # --- Assertions ---
+        # Verify all 6 pipeline steps are present
+        step_ids = [s["step_id"] for s in steps]
+        expected_steps = [
+            "parse_patient",
+            "clinical_reasoning",
+            "drug_interactions",
+            "guideline_retrieval",
+            "conflict_detection",
+            "synthesis",
+        ]
+        assert len(steps) == 6, f"Expected 6 steps, got {len(steps)}: {step_ids}"
+        for exp in expected_steps:
+            assert exp in step_ids, f"Missing expected step: {exp}"
+
+        # Verify all steps completed (not failed)
+        failed = [s["step_id"] for s in steps if s["status"] == "failed"]
+        assert not failed, f"Steps failed: {failed}"
+
+        completed = [s["step_id"] for s in steps if s["status"] == "completed"]
+        print(f"\n✓ All {len(completed)}/6 pipeline steps completed successfully.")
+
         # Print report
         report = result.get("report")
         if report:

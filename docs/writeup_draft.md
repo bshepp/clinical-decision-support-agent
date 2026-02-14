@@ -124,6 +124,22 @@ No fine-tuning was performed in the current version. The base `gemma-3-27b-it` m
 - **Scalability:** FastAPI + uvicorn supports async request handling. For high-throughput deployment, add worker processes and a task queue (e.g., Celery).
 - **EHR integration:** Current input is manual text paste. A production system would integrate with EHR systems via FHIR APIs for automatic patient data extraction.
 
+### Validation methodology
+
+The project includes an external dataset validation framework (`src/backend/validation/`) that tests the full pipeline against real-world clinical data:
+
+| Dataset | Source | What It Tests |
+|---------|--------|---------------|
+| **MedQA (USMLE)** | HuggingFace (1,273 test cases) | Diagnostic accuracy — does the pipeline's top differential match the USMLE correct answer? |
+| **MTSamples** | GitHub (~5,000 medical transcriptions) | Parse quality, field completeness, specialty alignment on real clinical notes |
+| **PMC Case Reports** | PubMed E-utilities (dynamic) | Diagnostic accuracy on published case reports with known diagnoses |
+
+The validation harness calls the `Orchestrator` directly (no HTTP server), enabling rapid batch testing. Each dataset has a dedicated harness that fetches data, converts it to patient narratives, runs the pipeline, and scores the output against ground truth.
+
+**Initial smoke test (3 MedQA cases):** 100% parse success, 66.7% top-1 diagnostic accuracy, ~94 s avg per case.
+
+Full-scale validation (50–100+ cases per dataset) is in progress.
+
 **Practical usage:**
 
 In a real clinical setting, the system would be used at the point of care:
@@ -138,13 +154,13 @@ In a real clinical setting, the system would be used at the point of care:
    - Suggested next steps (immediate, short-term, long-term)
 5. The clinician reviews the recommendations and incorporates them into their clinical judgment
 
-The system is explicitly designed as a **decision support** tool, not a decision-making tool. All recommendations include confidence levels and caveats. The clinician retains full authority over patient care.
+The system is explicitly designed as a **decision support** tool, not a decision-making tool. All recommendations include caveats and limitations. The clinician retains full authority over patient care.
 
 ---
 
 **Links:**
 
 - Video: [To be recorded]
-- Code Repository: [GitHub link to be added]
+- Code Repository: [github.com/bshepp/clinical-decision-support-agent](https://github.com/bshepp/clinical-decision-support-agent)
 - Live Demo: [To be deployed]
 - Hugging Face Model: N/A (using base Gemma 3 27B IT)

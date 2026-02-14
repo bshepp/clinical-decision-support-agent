@@ -247,13 +247,13 @@ All pipeline data is strongly typed via Pydantic models in `schemas.py` (~280 li
 
 ## Key Design Decisions
 
-1. **Custom orchestrator over LangChain/LlamaIndex** — Simpler, more transparent, easier to debug. We control the pipeline loop explicitly. No framework overhead for a sequential 5-step pipeline.
+1. **Custom orchestrator over LangChain/LlamaIndex** — Simpler, more transparent, easier to debug. We control the pipeline loop explicitly. No framework overhead for a sequential 6-step pipeline.
 
 2. **WebSocket for agent activity** — The frontend shows each step as it happens (parsing → reasoning → checking → retrieving → synthesizing). This real-time visibility is critical for clinician trust.
 
 3. **Structured outputs everywhere** — Every tool returns a Pydantic model. The synthesis agent receives structured data, not messy text. This ensures consistency and enables frontend rendering.
 
-4. **Gemma in two roles** — As the clinical reasoning engine (Step 2) AND as the synthesis engine (Step 5). The same model reasons about the case and then integrates all tool outputs into a coherent report.
+4. **Gemma in four roles** — As the patient parser (Step 1), clinical reasoning engine (Step 2), conflict detector (Step 5), and synthesis engine (Step 6). The same model extracts structured data, reasons about the case, identifies guideline-vs-patient conflicts, and integrates all tool outputs into a coherent report.
 
 5. **Graceful degradation** — If a tool fails (e.g., OpenFDA is down), the agent continues with available information and notes the gap in the final report.
 
@@ -286,3 +286,32 @@ All configuration lives in `config.py` (Pydantic Settings) and `.env`:
 - **Single-model:** Uses only Gemma 3 27B IT. Could benefit from specialized models for different steps.
 - **Guideline currency:** Guidelines are a static snapshot. A production system would need automated updates.
 - **No EHR integration:** Input is manual text paste. A production system would integrate with EHR FHIR APIs.
+
+---
+
+## Validation Framework
+
+The project includes an external dataset validation framework that tests the full pipeline against real-world clinical data — bypassing the HTTP server and calling the `Orchestrator` directly.
+
+### Datasets
+
+| Dataset | Source | Cases | What It Measures |
+|---------|--------|-------|------------------|
+| **MedQA (USMLE)** | HuggingFace (`GBaker/MedQA-USMLE-4-options`) | 1,273 | Diagnostic accuracy — top-1, top-3, mentioned |
+| **MTSamples** | GitHub (`socd06/medical-nlp`) | ~5,000 | Parse quality, field completeness, specialty alignment |
+| **PMC Case Reports** | PubMed E-utilities (esearch + efetch) | Dynamic | Diagnostic accuracy on published cases with known diagnoses |
+
+### Architecture
+
+```
+validation/
+├── base.py               # ValidationCase, ValidationResult, ValidationSummary
+│                         # run_cds_pipeline() — direct Orchestrator invocation
+│                         # fuzzy_match(), diagnosis_in_differential()
+├── harness_medqa.py      # Fetch from HuggingFace, extract vignettes, score diagnostics
+├── harness_mtsamples.py  # Fetch CSV, stratified sampling, score parse quality
+├── harness_pmc.py        # PubMed E-utilities, title-based diagnosis extraction
+└── run_validation.py     # Unified CLI: --medqa --mtsamples --pmc --all --max-cases N
+```
+
+All datasets are cached locally in `validation/data/` (gitignored). Results are saved to `validation/results/` (also gitignored).
