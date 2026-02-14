@@ -1,0 +1,257 @@
+"""
+Base classes and utilities for the validation framework.
+
+Provides:
+  - ValidationCase: a single test case with input + ground truth
+  - ValidationResult: scored result for a single case
+  - ValidationSummary: aggregate metrics for a dataset
+  - run_cds_pipeline(): runs a case through the orchestrator directly
+  - fuzzy_match(): soft string matching for diagnosis comparison
+"""
+from __future__ import annotations
+
+import asyncio
+import json
+import re
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+# ── CDS pipeline imports ──
+import sys
+
+# Ensure the backend app is importable
+BACKEND_DIR = Path(__file__).resolve().parent.parent
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
+from app.agent.orchestrator import Orchestrator
+from app.models.schemas import CaseSubmission, CDSReport, AgentState
+
+
+# ──────────────────────────────────────────────
+# Data classes
+# ──────────────────────────────────────────────
+
+@dataclass
+class ValidationCase:
+    """A single validation test case."""
+    case_id: str
+    source_dataset: str                    # "medqa", "mtsamples", "pmc"
+    input_text: str                        # Clinical text fed to the pipeline
+    ground_truth: Dict[str, Any]           # Dataset-specific ground truth
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class ValidationResult:
+    """Result of running one case through the pipeline + scoring."""
+    case_id: str
+    source_dataset: str
+    success: bool                          # Pipeline completed without crash
+    scores: Dict[str, float]              # Metric name → score (0.0–1.0)
+    pipeline_time_ms: int = 0
+    step_results: Dict[str, str] = field(default_factory=dict)  # step_id → status
+    report_summary: Optional[str] = None
+    error: Optional[str] = None
+    details: Dict[str, Any] = field(default_factory=dict)       # Extra scoring info
+
+
+@dataclass
+class ValidationSummary:
+    """Aggregate metrics for a dataset validation run."""
+    dataset: str
+    total_cases: int
+    successful_cases: int
+    failed_cases: int
+    metrics: Dict[str, float]              # Metric name → average score
+    per_case: List[ValidationResult]
+    run_duration_sec: float
+    timestamp: str = ""
+
+    def __post_init__(self):
+        if not self.timestamp:
+            self.timestamp = datetime.now(timezone.utc).isoformat()
+
+
+# ──────────────────────────────────────────────
+# Pipeline runner
+# ──────────────────────────────────────────────
+
+async def run_cds_pipeline(
+    patient_text: str,
+    include_drug_check: bool = True,
+    include_guidelines: bool = True,
+    timeout_sec: int = 180,
+) -> tuple[Optional[AgentState], Optional[CDSReport], Optional[str]]:
+    """
+    Run a single case through the CDS pipeline directly (no HTTP server needed).
+
+    Returns:
+        (state, report, error) — error is None on success
+    """
+    case = CaseSubmission(
+        patient_text=patient_text,
+        include_drug_check=include_drug_check,
+        include_guidelines=include_guidelines,
+    )
+    orchestrator = Orchestrator()
+
+    try:
+        async for _step_update in orchestrator.run(case):
+            pass  # consume all step updates
+
+        return orchestrator.state, orchestrator.get_result(), None
+    except asyncio.TimeoutError:
+        return orchestrator.state, None, f"Pipeline timed out after {timeout_sec}s"
+    except Exception as e:
+        return orchestrator.state, None, str(e)
+
+
+# ──────────────────────────────────────────────
+# Fuzzy string matching for diagnosis comparison
+# ──────────────────────────────────────────────
+
+def normalize_text(text: str) -> str:
+    """Lowercase, strip punctuation, normalize whitespace."""
+    text = text.lower().strip()
+    text = re.sub(r'[^\w\s]', ' ', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text
+
+
+def fuzzy_match(candidate: str, target: str, threshold: float = 0.6) -> bool:
+    """
+    Check if candidate text is a fuzzy match for target.
+
+    Uses token overlap (Jaccard-like) rather than edit distance —
+    medical terms are long and we care about semantic overlap, not typos.
+
+    Args:
+        candidate: Text from the pipeline output
+        target: Ground truth text
+        threshold: Minimum token overlap ratio (0.0–1.0)
+    """
+    c_tokens = set(normalize_text(candidate).split())
+    t_tokens = set(normalize_text(target).split())
+
+    if not t_tokens:
+        return False
+
+    # If target is a substring of candidate (or vice versa), that's a match
+    if normalize_text(target) in normalize_text(candidate):
+        return True
+    if normalize_text(candidate) in normalize_text(target):
+        return True
+
+    # Token overlap
+    overlap = len(c_tokens & t_tokens)
+    denominator = min(len(c_tokens), len(t_tokens))
+    if denominator == 0:
+        return False
+
+    return (overlap / denominator) >= threshold
+
+
+def diagnosis_in_differential(
+    target_diagnosis: str,
+    report: CDSReport,
+    top_n: Optional[int] = None,
+) -> tuple[bool, int]:
+    """
+    Check if target_diagnosis appears in the report's differential.
+
+    Returns:
+        (found, rank) — rank is 0-indexed position, or -1 if not found
+    """
+    diagnoses = report.differential_diagnosis
+    if top_n:
+        diagnoses = diagnoses[:top_n]
+
+    for i, dx in enumerate(diagnoses):
+        if fuzzy_match(dx.diagnosis, target_diagnosis):
+            return True, i
+
+    # Also check the full report text (patient_summary, guideline_recommendations, etc.)
+    full_text = " ".join([
+        report.patient_summary or "",
+        " ".join(report.guideline_recommendations),
+        " ".join(a.action for a in report.suggested_next_steps),
+    ])
+    if fuzzy_match(full_text, target_diagnosis, threshold=0.3):
+        return True, len(diagnoses)  # found but not in differential
+
+    return False, -1
+
+
+# ──────────────────────────────────────────────
+# I/O utilities
+# ──────────────────────────────────────────────
+
+DATA_DIR = Path(__file__).resolve().parent / "data"
+
+
+def ensure_data_dir():
+    """Create the data directory if it doesn't exist."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+
+
+def save_results(summary: ValidationSummary, filename: str = None):
+    """Save validation results to JSON."""
+    results_dir = Path(__file__).resolve().parent / "results"
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    if filename is None:
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
+        filename = f"{summary.dataset}_{ts}.json"
+
+    path = results_dir / filename
+
+    # Convert to serializable dict
+    data = {
+        "dataset": summary.dataset,
+        "total_cases": summary.total_cases,
+        "successful_cases": summary.successful_cases,
+        "failed_cases": summary.failed_cases,
+        "metrics": summary.metrics,
+        "run_duration_sec": summary.run_duration_sec,
+        "timestamp": summary.timestamp,
+        "per_case": [
+            {
+                "case_id": r.case_id,
+                "success": r.success,
+                "scores": r.scores,
+                "pipeline_time_ms": r.pipeline_time_ms,
+                "step_results": r.step_results,
+                "report_summary": r.report_summary,
+                "error": r.error,
+                "details": r.details,
+            }
+            for r in summary.per_case
+        ],
+    }
+
+    path.write_text(json.dumps(data, indent=2, default=str))
+    return path
+
+
+def print_summary(summary: ValidationSummary):
+    """Pretty-print validation results to console."""
+    print(f"\n{'='*60}")
+    print(f"  Validation Results: {summary.dataset.upper()}")
+    print(f"{'='*60}")
+    print(f"  Total cases:      {summary.total_cases}")
+    print(f"  Successful:       {summary.successful_cases}")
+    print(f"  Failed:           {summary.failed_cases}")
+    print(f"  Duration:         {summary.run_duration_sec:.1f}s")
+    print(f"\n  Metrics:")
+    for metric, value in sorted(summary.metrics.items()):
+        if "time" in metric and isinstance(value, (int, float)):
+            print(f"    {metric:30s} {value:.0f}ms")
+        elif isinstance(value, float):
+            print(f"    {metric:30s} {value:.1%}")
+        else:
+            print(f"    {metric:30s} {value}")
+    print(f"{'='*60}\n")

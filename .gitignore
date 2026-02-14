@@ -39,6 +39,10 @@ out/
 # Test outputs
 results.json
 
+# Validation datasets (downloaded on demand) and results
+src/backend/validation/data/
+src/backend/validation/results/
+
 # Models (too large for git)
 models/*.bin
 models/*.pt
