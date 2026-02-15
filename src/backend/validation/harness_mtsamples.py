@@ -33,11 +33,14 @@ from validation.base import (
     ValidationCase,
     ValidationResult,
     ValidationSummary,
+    clear_checkpoint,
     ensure_data_dir,
     fuzzy_match,
+    load_checkpoint,
     normalize_text,
     print_summary,
     run_cds_pipeline,
+    save_incremental,
     save_results,
 )
 
@@ -238,6 +241,7 @@ async def validate_mtsamples(
     include_drug_check: bool = True,
     include_guidelines: bool = True,
     delay_between_cases: float = 2.0,
+    resume: bool = False,
 ) -> ValidationSummary:
     """
     Run MTSamples cases through the CDS pipeline and score results.
@@ -245,8 +249,23 @@ async def validate_mtsamples(
     results: List[ValidationResult] = []
     start_time = time.time()
 
+    # Resume support
+    completed_ids: set = set()
+    if resume:
+        prior = load_checkpoint("mtsamples")
+        if prior:
+            results.extend(prior)
+            completed_ids = {r.case_id for r in prior}
+            print(f"  Resuming: {len(prior)} cases loaded from checkpoint, {len(cases) - len(completed_ids)} remaining")
+    else:
+        clear_checkpoint("mtsamples")
+
     for i, case in enumerate(cases):
         specialty = case.ground_truth.get("specialty", "?")
+        if case.case_id in completed_ids:
+            print(f"\n  [{i+1}/{len(cases)}] {case.case_id} ({specialty}): (cached) skipped")
+            continue
+
         print(f"\n  [{i+1}/{len(cases)}] {case.case_id} ({specialty}): ", end="", flush=True)
 
         case_start = time.monotonic()
@@ -321,7 +340,7 @@ async def validate_mtsamples(
             details = {"specialty": specialty, "error": error}
             print(f"✗ FAILED: {error[:80] if error else 'unknown'}")
 
-        results.append(ValidationResult(
+        result = ValidationResult(
             case_id=case.case_id,
             source_dataset="mtsamples",
             success=report is not None,
@@ -331,7 +350,9 @@ async def validate_mtsamples(
             report_summary=report.patient_summary[:200] if report else None,
             error=error,
             details=details,
-        ))
+        )
+        results.append(result)
+        save_incremental(result, "mtsamples")  # checkpoint after every case
 
         if i < len(cases) - 1:
             await asyncio.sleep(delay_between_cases)

@@ -48,6 +48,7 @@ async def run_all_validations(
     include_guidelines: bool = True,
     delay: float = 2.0,
     fetch_only: bool = False,
+    resume: bool = False,
 ) -> dict:
     """
     Run validation against selected datasets.
@@ -73,6 +74,7 @@ async def run_all_validations(
                 include_drug_check=include_drug_check,
                 include_guidelines=include_guidelines,
                 delay_between_cases=delay,
+                resume=resume,
             )
             print_summary(summary)
             save_results(summary)
@@ -94,6 +96,7 @@ async def run_all_validations(
                 include_drug_check=include_drug_check,
                 include_guidelines=include_guidelines,
                 delay_between_cases=delay,
+                resume=resume,
             )
             print_summary(summary)
             save_results(summary)
@@ -115,6 +118,7 @@ async def run_all_validations(
                 include_drug_check=include_drug_check,
                 include_guidelines=include_guidelines,
                 delay_between_cases=delay,
+                resume=resume,
             )
             print_summary(summary)
             save_results(summary)
@@ -235,6 +239,7 @@ Examples:
     config_group.add_argument("--delay", type=float, default=2.0, help="Delay between cases in seconds (default: 2.0)")
     config_group.add_argument("--no-drugs", action="store_true", help="Skip drug interaction checks")
     config_group.add_argument("--no-guidelines", action="store_true", help="Skip guideline retrieval")
+    config_group.add_argument("--resume", action="store_true", help="Resume from checkpoint (skip already-completed cases)")
     config_group.add_argument("--fetch-only", action="store_true", help="Only download data, don't run pipeline")
 
     args = parser.parse_args()
@@ -254,6 +259,7 @@ Examples:
     print(f"  Cases/dataset: {args.max_cases}")
     print(f"  Drug check:    {'Yes' if not args.no_drugs else 'No'}")
     print(f"  Guidelines:    {'Yes' if not args.no_guidelines else 'No'}")
+    print(f"  Resume:        {'Yes' if args.resume else 'No'}")
     print(f"  Fetch only:    {'Yes' if args.fetch_only else 'No'}")
 
     asyncio.run(run_all_validations(
@@ -266,6 +272,7 @@ Examples:
         include_guidelines=not args.no_guidelines,
         delay=args.delay,
         fetch_only=args.fetch_only,
+        resume=args.resume,
     ))
 
 

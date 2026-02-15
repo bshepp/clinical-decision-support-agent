@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 # ──────────────────────────────────────────────
@@ -172,6 +172,16 @@ class ClinicalConflict(BaseModel):
     """A single detected conflict between guidelines and patient data."""
     conflict_type: ConflictType = Field(..., description="Category of the conflict")
     severity: Severity = Field(..., description="Potential clinical impact")
+
+    @field_validator("conflict_type", mode="before")
+    @classmethod
+    def _normalise_conflict_type(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
+
+    @field_validator("severity", mode="before")
+    @classmethod
+    def _normalise_severity(cls, v: str) -> str:
+        return v.lower() if isinstance(v, str) else v
     guideline_source: str = Field(..., description="Which guideline flagged this")
     guideline_text: str = Field(..., description="What the guideline recommends")
     patient_data: str = Field(..., description="Relevant patient data that conflicts")

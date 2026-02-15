@@ -191,6 +191,7 @@ def diagnosis_in_differential(
 # ──────────────────────────────────────────────
 
 DATA_DIR = Path(__file__).resolve().parent / "data"
+RESULTS_DIR = Path(__file__).resolve().parent / "results"
 
 
 def ensure_data_dir():
@@ -198,16 +199,87 @@ def ensure_data_dir():
     DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _result_to_dict(r: ValidationResult) -> dict:
+    """Convert a ValidationResult to a serialisable dict."""
+    return {
+        "case_id": r.case_id,
+        "source_dataset": r.source_dataset,
+        "success": r.success,
+        "scores": r.scores,
+        "pipeline_time_ms": r.pipeline_time_ms,
+        "step_results": r.step_results,
+        "report_summary": r.report_summary,
+        "error": r.error,
+        "details": r.details,
+    }
+
+
+# ──────────────────────────────────────────────
+# Incremental checkpoint (JSONL)
+# ──────────────────────────────────────────────
+
+def checkpoint_path(dataset: str) -> Path:
+    """Return the path to the checkpoint JSONL for *dataset*."""
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
+    return RESULTS_DIR / f"{dataset}_checkpoint.jsonl"
+
+
+def save_incremental(result: ValidationResult, dataset: str) -> None:
+    """Append a single case result to the checkpoint JSONL file."""
+    path = checkpoint_path(dataset)
+    with open(path, "a", encoding="utf-8") as f:
+        f.write(json.dumps(_result_to_dict(result), default=str) + "\n")
+
+
+def load_checkpoint(dataset: str) -> List[ValidationResult]:
+    """
+    Load previously-completed results from the checkpoint file.
+
+    Returns a list of ValidationResult objects (may be empty).
+    """
+    path = checkpoint_path(dataset)
+    if not path.exists():
+        return []
+
+    results: List[ValidationResult] = []
+    for line in path.read_text(encoding="utf-8").strip().split("\n"):
+        if not line.strip():
+            continue
+        d = json.loads(line)
+        results.append(ValidationResult(
+            case_id=d["case_id"],
+            source_dataset=d.get("source_dataset", dataset),
+            success=d["success"],
+            scores=d["scores"],
+            pipeline_time_ms=d.get("pipeline_time_ms", 0),
+            step_results=d.get("step_results", {}),
+            report_summary=d.get("report_summary"),
+            error=d.get("error"),
+            details=d.get("details", {}),
+        ))
+    return results
+
+
+def clear_checkpoint(dataset: str) -> None:
+    """Delete checkpoint file for a fresh run."""
+    path = checkpoint_path(dataset)
+    if path.exists():
+        path.unlink()
+
+
+# ──────────────────────────────────────────────
+# Final results save
+# ──────────────────────────────────────────────
+
 def save_results(summary: ValidationSummary, filename: str = None):
     """Save validation results to JSON."""
-    results_dir = Path(__file__).resolve().parent / "results"
-    results_dir.mkdir(parents=True, exist_ok=True)
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     if filename is None:
         ts = datetime.now(timezone.utc).strftime("%Y%m%d_%H%M%S")
         filename = f"{summary.dataset}_{ts}.json"
 
-    path = results_dir / filename
+    path = RESULTS_DIR / filename
 
     # Convert to serializable dict
     data = {
@@ -218,19 +290,7 @@ def save_results(summary: ValidationSummary, filename: str = None):
         "metrics": summary.metrics,
         "run_duration_sec": summary.run_duration_sec,
         "timestamp": summary.timestamp,
-        "per_case": [
-            {
-                "case_id": r.case_id,
-                "success": r.success,
-                "scores": r.scores,
-                "pipeline_time_ms": r.pipeline_time_ms,
-                "step_results": r.step_results,
-                "report_summary": r.report_summary,
-                "error": r.error,
-                "details": r.details,
-            }
-            for r in summary.per_case
-        ],
+        "per_case": [_result_to_dict(r) for r in summary.per_case],
     }
 
     path.write_text(json.dumps(data, indent=2, default=str))
