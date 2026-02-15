@@ -297,7 +297,7 @@ def clear_checkpoint(dataset: str) -> None:
 # Final results save
 # ──────────────────────────────────────────────
 
-def save_results(summary: ValidationSummary, filename: str = None):
+def save_results(summary: ValidationSummary, filename: Optional[str] = None):
     """Save validation results to JSON."""
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 

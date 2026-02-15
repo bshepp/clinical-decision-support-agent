@@ -242,6 +242,7 @@ async def rebuild_chroma(persist_dir: str):
     from app.tools.guideline_retrieval import GuidelineRetrievalTool
     tool = GuidelineRetrievalTool()
     await tool._ensure_initialized()
+    assert tool._collection is not None, "Collection failed to initialize"
     count = tool._collection.count()
     print(f"  Rebuilt collection with {count} guidelines")
     return tool
@@ -252,6 +253,7 @@ async def show_stats(persist_dir: str):
     from app.tools.guideline_retrieval import GuidelineRetrievalTool
     tool = GuidelineRetrievalTool()
     await tool._ensure_initialized()
+    assert tool._collection is not None, "Collection failed to initialize"
 
     count = tool._collection.count()
     print(f"\n  Collection: clinical_guidelines")
@@ -371,6 +373,7 @@ async def main():
         from app.tools.guideline_retrieval import GuidelineRetrievalTool
         tool = GuidelineRetrievalTool()
         await tool._ensure_initialized()
+        assert tool._collection is not None, "Collection failed to initialize"
         count = tool._collection.count()
         print(f"\n  Collection has {count} documents")
         if count == 0:

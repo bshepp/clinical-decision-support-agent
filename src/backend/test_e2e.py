@@ -25,6 +25,8 @@ async def main():
         print(f"Submitted case: {case_id}")
 
         # Poll until done
+        steps: list = []
+        result: dict = {}
         for i in range(60):  # up to 5 minutes
             await asyncio.sleep(5)
             r = await client.get(f"{API}/api/cases/{case_id}")

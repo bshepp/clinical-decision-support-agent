@@ -32,8 +32,9 @@ if str(BACKEND_DIR) not in sys.path:
 # Load .env and export HF_TOKEN so huggingface_hub picks it up
 from dotenv import load_dotenv
 load_dotenv(BACKEND_DIR / ".env")
-if os.getenv("HF_TOKEN"):
-    os.environ["HF_TOKEN"] = os.getenv("HF_TOKEN")
+hf_token = os.getenv("HF_TOKEN")
+if hf_token:
+    os.environ["HF_TOKEN"] = hf_token
 
 from validation.base import (
     ValidationSummary,
