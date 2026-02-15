@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     rxnorm_base_url: str = "https://rxnav.nlm.nih.gov/REST"
     pubmed_base_url: str = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils"
     pubmed_api_key: str = ""  # Optional, increases rate limits
+    hf_token: str = ""  # HuggingFace token for dataset downloads
 
     # RAG
     chroma_persist_dir: str = "./data/chroma"

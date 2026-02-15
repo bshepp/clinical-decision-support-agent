@@ -18,6 +18,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import sys
 import time
 from datetime import datetime, timezone
@@ -27,6 +28,12 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
+
+# Load .env and export HF_TOKEN so huggingface_hub picks it up
+from dotenv import load_dotenv
+load_dotenv(BACKEND_DIR / ".env")
+if os.getenv("HF_TOKEN"):
+    os.environ["HF_TOKEN"] = os.getenv("HF_TOKEN")
 
 from validation.base import (
     ValidationSummary,
@@ -163,7 +170,7 @@ def _print_combined_summary(results: dict, total_duration: float):
         )
 
     # All metrics
-    print(f"\n  {'─' * 66}")
+    print(f"\n  {'-' * 66}")
     for name, summary in results.items():
         print(f"\n  {name.upper()} metrics:")
         for metric, value in sorted(summary.metrics.items()):
@@ -252,9 +259,9 @@ Examples:
     run_mtsamples = args.all or args.mtsamples
     run_pmc = args.all or args.pmc
 
-    print("╔════════════════════════════════════════════════════════╗")
-    print("║   Clinical Decision Support Agent — Validation Suite  ║")
-    print("╚════════════════════════════════════════════════════════╝")
+    print("=" * 58)
+    print("   Clinical Decision Support Agent - Validation Suite")
+    print("=" * 58)
     print(f"\n  Datasets:     {'MedQA ' if run_medqa else ''}{'MTSamples ' if run_mtsamples else ''}{'PMC ' if run_pmc else ''}")
     print(f"  Cases/dataset: {args.max_cases}")
     print(f"  Drug check:    {'Yes' if not args.no_drugs else 'No'}")

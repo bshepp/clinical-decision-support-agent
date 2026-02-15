@@ -373,15 +373,15 @@ async def validate_pmc(
 
         if report:
             # Diagnostic accuracy (anywhere in differential)
-            found_any, rank_any = diagnosis_in_differential(target_diagnosis, report)
+            found_any, rank_any, loc_any = diagnosis_in_differential(target_diagnosis, report)
             scores["diagnostic_accuracy"] = 1.0 if found_any else 0.0
 
             # Top-3 accuracy
-            found_top3, rank3 = diagnosis_in_differential(target_diagnosis, report, top_n=3)
+            found_top3, rank3, loc3 = diagnosis_in_differential(target_diagnosis, report, top_n=3)
             scores["top3_accuracy"] = 1.0 if found_top3 else 0.0
 
             # Top-1 accuracy
-            found_top1, rank1 = diagnosis_in_differential(target_diagnosis, report, top_n=1)
+            found_top1, rank1, loc1 = diagnosis_in_differential(target_diagnosis, report, top_n=1)
             scores["top1_accuracy"] = 1.0 if found_top1 else 0.0
 
             # Parse success

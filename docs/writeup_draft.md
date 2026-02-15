@@ -53,15 +53,16 @@ Estimated reach: There are approximately 140 million ED visits per year in the U
 
 **HAI-DEF models used:**
 
-- **Gemma 3 27B IT** (`gemma-3-27b-it`) — accessed via Google AI Studio's OpenAI-compatible endpoint
+- **MedGemma** (`google/medgemma-27b-text-it`) — Google's medical-domain model from the Health AI Developer Foundations (HAI-DEF) collection
+- Development/validation also performed with **Gemma 3 27B IT** (`gemma-3-27b-it`) via Google AI Studio for rapid iteration
 
-**Why this model:**
+**Why MedGemma:**
 
-Gemma 3 27B IT provides the right balance of capability and accessibility for a clinical decision support application:
-- Large enough to perform complex clinical reasoning with chain-of-thought transparency
+MedGemma is purpose-built for medical applications and is part of Google's HAI-DEF collection:
+- Trained specifically for health and biomedical tasks, providing stronger clinical reasoning than general-purpose models
 - Open-weight model that can be self-hosted for HIPAA compliance in production
-- Available via API for rapid development and demonstration
-- Part of the HAI-DEF family, designed with health AI applications in mind
+- Large enough (27B parameters) for complex chain-of-thought clinical reasoning
+- Designed to be the foundation for healthcare AI applications — exactly what this competition demands
 
 **How the model is used:**
 
@@ -96,7 +97,7 @@ All inter-step data is strongly typed with Pydantic v2 models. The pipeline stre
 
 **Fine-tuning:**
 
-No fine-tuning was performed in the current version. The base `gemma-3-27b-it` model was used with carefully crafted prompt engineering for each pipeline step. Fine-tuning on clinical reasoning datasets is a planned improvement.
+No fine-tuning was performed in the current version. The base MedGemma model (`medgemma-27b-text-it`) was used with carefully crafted prompt engineering for each pipeline step. Fine-tuning on clinical reasoning datasets is a planned improvement.
 
 **Performance analysis:**
 
@@ -113,13 +114,13 @@ No fine-tuning was performed in the current version. The base `gemma-3-27b-it` m
 |-------|-----------|
 | Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS |
 | Backend | FastAPI, Python 3.10, Pydantic v2, WebSocket |
-| LLM | Gemma 3 27B IT via Google AI Studio |
+| LLM | MedGemma 27B Text IT (HAI-DEF) + Gemma 3 27B IT for dev |
 | RAG | ChromaDB + sentence-transformers (all-MiniLM-L6-v2) |
 | Drug Data | OpenFDA API, RxNorm / NLM API |
 
 **Deployment considerations:**
 
-- **HIPAA compliance:** Gemma is an open-weight model that can be self-hosted on-premises, eliminating the need to send patient data to external APIs. This is critical for healthcare deployment.
+- **HIPAA compliance:** MedGemma is an open-weight model that can be self-hosted on-premises, eliminating the need to send patient data to external APIs. This is critical for healthcare deployment.
 - **Latency:** Current pipeline takes ~75 s end-to-end. For production, this could be reduced with: smaller/distilled models, parallel LLM calls, or GPU-accelerated inference.
 - **Scalability:** FastAPI + uvicorn supports async request handling. For high-throughput deployment, add worker processes and a task queue (e.g., Celery).
 - **EHR integration:** Current input is manual text paste. A production system would integrate with EHR systems via FHIR APIs for automatic patient data extraction.
@@ -163,4 +164,4 @@ The system is explicitly designed as a **decision support** tool, not a decision
 - Video: [To be recorded]
 - Code Repository: [github.com/bshepp/clinical-decision-support-agent](https://github.com/bshepp/clinical-decision-support-agent)
 - Live Demo: [To be deployed]
-- Hugging Face Model: N/A (using base Gemma 3 27B IT)
+- Hugging Face Model: [google/medgemma-27b-text-it](https://huggingface.co/google/medgemma-27b-text-it)

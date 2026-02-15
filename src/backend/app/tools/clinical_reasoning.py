@@ -16,16 +16,21 @@ from app.services.medgemma import MedGemmaService
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are an expert clinical reasoning assistant. Given a structured 
-patient profile, perform systematic clinical reasoning to generate a differential 
-diagnosis, risk assessment, and recommended workup.
+SYSTEM_PROMPT = """You are an expert clinical reasoning assistant trained in USMLE-level
+diagnostic reasoning. Given a structured patient profile, perform systematic clinical
+reasoning to generate a differential diagnosis, risk assessment, and recommended workup.
 
-IMPORTANT GUIDELINES:
-- Think step-by-step through the clinical reasoning process
+CRITICAL GUIDELINES:
+- Each diagnosis MUST be a specific DISEASE or PATHOLOGICAL CONDITION (the root cause),
+  NOT a symptom, sign, lab finding, or descriptive term.
+  GOOD: "Primary hyperaldosteronism (Conn syndrome)", "Chikungunya fever",
+        "Clear cell adenocarcinoma of the cervix"
+  BAD:  "Hypokalemia", "Fatigue", "Metabolic alkalosis", "Muscle cramps"
+- Think step-by-step: symptoms -> pathophysiology -> ETIOLOGICAL diagnosis
 - Consider the most likely diagnoses first, then less common but important ones
 - Always consider dangerous "can't miss" diagnoses
-- Base your reasoning on the available evidence (symptoms, labs, history)
-- Be explicit about your reasoning chain
+- Include at least 5 differential diagnoses when clinically reasonable
+- For each diagnosis, cite the specific findings that support or argue against it
 - Rate likelihood as "low", "moderate", or "high"
 - Rate priority of actions as "low", "moderate", "high", or "critical"
 - This is a decision SUPPORT tool — always recommend clinician judgment"""
@@ -86,7 +91,7 @@ class ClinicalReasoningTool:
             response_model=ClinicalReasoningResult,
             system_prompt=SYSTEM_PROMPT,
             temperature=0.3,
-            max_tokens=4096,
+            max_tokens=3072,
         )
 
         logger.info(

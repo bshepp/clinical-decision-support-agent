@@ -61,6 +61,7 @@ class PatientParserTool:
                 response_model=PatientProfile,
                 system_prompt=SYSTEM_PROMPT,
                 temperature=0.1,  # Low temp for factual extraction
+                max_tokens=1500,
             )
             logger.info(f"Parsed patient profile: {profile.chief_complaint}")
             return profile

@@ -22,47 +22,75 @@ from app.services.medgemma import MedGemmaService
 
 logger = logging.getLogger(__name__)
 
-SYSTEM_PROMPT = """You are a clinical decision support synthesis engine. Your job is to 
-combine outputs from multiple clinical tools into a single, cohesive report for a clinician.
+SYSTEM_PROMPT = """You are an expert clinical arbiter and decision support engine. You receive
+an initial differential diagnosis from a clinical reasoning agent, PLUS independent evidence
+from drug-interaction checks, clinical guideline retrieval, and conflict detection.
 
-CRITICAL RULES:
-1. Be concise and clinically precise
-2. Prioritize safety — drug interactions and critical findings go first
-3. Clearly distinguish between tool-verified facts and model-generated reasoning
-4. Always include caveats and limitations
-5. Cite sources when available
-6. This report SUPPORTS clinical decision-making — it does NOT replace clinician judgment
-7. Include a standard disclaimer about AI-generated content"""
+Your job is NOT merely to format these outputs. You are the FINAL DECISION MAKER:
+1. CRITICALLY RE-EVALUATE the initial differential using ALL available evidence.
+2. RE-RANK diagnoses: promote diagnoses that gain guideline/drug/conflict support;
+   demote diagnoses that lose support or are contradicted.
+3. ADD any diagnosis that the evidence strongly suggests but was MISSING from the initial list.
+4. REMOVE or deprioritize diagnoses that are inconsistent with guideline-based evidence.
+5. For the top diagnosis, explicitly state which evidence (guideline excerpts, drug signals,
+   conflict findings) supports or contradicts it.
+6. Prioritize safety — drug interactions and critical conflicts go first.
+7. This report SUPPORTS clinical decision-making — it does NOT replace clinician judgment.
+8. Be concise and clinically precise. Cite sources.
 
-SYNTHESIS_PROMPT = """Synthesize the following clinical tool outputs into a cohesive 
-Clinical Decision Support report.
+You are an independent reviewer, not a rubber stamp. If the initial reasoning is wrong,
+override it with evidence-based conclusions."""
+
+SYNTHESIS_PROMPT = """You are given outputs from multiple independent clinical analysis tools.
+Your task is to act as an ARBITER: critically evaluate all evidence and produce a final,
+evidence-based Clinical Decision Support report.
 
 ═══ PATIENT PROFILE ═══
 {patient_profile}
 
-═══ CLINICAL REASONING (MedGemma) ═══
+═══ INITIAL CLINICAL REASONING (from reasoning agent) ═══
 {clinical_reasoning}
 
-═══ DRUG INTERACTION CHECK ═══
+═══ DRUG INTERACTION CHECK (independent tool) ═══
 {drug_interactions}
 
-═══ CLINICAL GUIDELINES ═══
+═══ CLINICAL GUIDELINES (RAG retrieval — independent evidence) ═══
 {guidelines}
 
-═══ CONFLICTS & GAPS DETECTED ═══
+═══ CONFLICTS & GAPS DETECTED (independent analysis) ═══
 {conflicts}
 
-Create a comprehensive CDS report including:
+══════════════════════════════════════
+ARBITRATION INSTRUCTIONS — Follow these steps:
+══════════════════════════════════════
+
+STEP 1 — CHALLENGE THE INITIAL DIFFERENTIAL:
+For each diagnosis in the initial reasoning, ask:
+  • Does the guideline evidence SUPPORT or CONTRADICT this diagnosis?
+  • Do the drug interactions or conflict findings change the likelihood?
+  • Is there a diagnosis NOT in the initial list that the guidelines strongly suggest?
+
+STEP 2 — RE-RANK AND REVISE:
+Produce a REVISED differential diagnosis list. This may differ from the initial one.
+  • Promote diagnoses with strong guideline concordance.
+  • Demote diagnoses contradicted by evidence.
+  • Add new diagnoses suggested by guideline/conflict evidence.
+  • For each diagnosis, state the supporting AND contradicting evidence.
+
+STEP 3 — PRODUCE THE FINAL REPORT:
 1. Patient Summary — concise summary of the case
-2. Differential Diagnosis — ranked with reasoning, integrating guideline concordance
+2. Differential Diagnosis — YOUR REVISED ranking (not just a copy of the initial one),
+   with explicit evidence citations for each diagnosis
 3. Drug Interaction Warnings — any flagged interactions with clinical significance
 4. Guideline-Concordant Recommendations — actionable steps aligned with guidelines
-5. Conflicts & Gaps — PROMINENTLY include every detected conflict. For each conflict,
-   state what the guideline recommends, what the patient's current state is, and the
-   suggested resolution. This section is CRITICAL for patient safety.
-6. Suggested Next Steps — prioritized actions for the clinician, incorporating conflict resolutions
-7. Caveats — limitations, uncertainties, and important disclaimers
-8. Sources — cited guidelines and data sources used"""
+5. Conflicts & Gaps — PROMINENTLY include every detected conflict. For each:
+   state what the guideline recommends vs. patient's current state, and the resolution.
+6. Suggested Next Steps — prioritized actions incorporating ALL evidence
+7. Caveats — limitations, uncertainties, disclaimers
+8. Sources — cited guidelines and data sources
+
+IMPORTANT: Your differential diagnosis MUST reflect your independent arbiter judgment,
+not merely repeat the initial reasoning. If evidence changes the ranking, CHANGE IT."""
 
 
 class SynthesisTool:
@@ -104,7 +132,7 @@ class SynthesisTool:
             response_model=CDSReport,
             system_prompt=SYSTEM_PROMPT,
             temperature=0.2,
-            max_tokens=4096,
+            max_tokens=3000,
         )
 
         # Add standard disclaimer to caveats

@@ -125,7 +125,7 @@ class ConflictDetectionTool:
             response_model=ConflictDetectionResult,
             system_prompt=SYSTEM_PROMPT,
             temperature=0.1,  # Low temp for safety-critical analysis
-            max_tokens=4096,
+            max_tokens=2000,
         )
 
         # Fill in metadata

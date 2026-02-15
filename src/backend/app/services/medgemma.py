@@ -125,25 +125,44 @@ class MedGemmaService:
     async def _generate_api(
         self, prompt: str, system_prompt: Optional[str], max_tokens: int, temperature: float
     ) -> str:
-        """Generate via OpenAI-compatible API."""
+        """Generate via OpenAI-compatible API.
+
+        MedGemma (served by TGI on HuggingFace Endpoints) natively supports the
+        system role, so we send system/user messages properly.  If the backend
+        happens to be plain Gemma on Google AI Studio (which rejects the system
+        role), we automatically fall back to folding the system prompt into the
+        user message.
+        """
         client = await self._get_client()
 
         messages = []
-        # Some models (e.g. Gemma via Google AI Studio) don't support system role.
-        # Try with system prompt first, fall back to folding it into the user message.
         if system_prompt:
-            user_content = f"{system_prompt}\n\n{prompt}"
-        else:
-            user_content = prompt
-        messages.append({"role": "user", "content": user_content})
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
 
-        response = await client.chat.completions.create(
-            model=settings.medgemma_model_id,
-            messages=messages,
-            max_tokens=max_tokens,
-            temperature=temperature,
-        )
-        return response.choices[0].message.content
+        try:
+            response = await client.chat.completions.create(
+                model=settings.medgemma_model_id,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            # Fallback: fold system prompt into user message (Google AI Studio compat)
+            if system_prompt and "system" in str(e).lower():
+                logger.warning("Backend rejected system role — folding into user message.")
+                fallback_messages = [
+                    {"role": "user", "content": f"{system_prompt}\n\n{prompt}"}
+                ]
+                response = await client.chat.completions.create(
+                    model=settings.medgemma_model_id,
+                    messages=fallback_messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                )
+                return response.choices[0].message.content
+            raise
 
     async def _generate_local(
         self, prompt: str, system_prompt: Optional[str], max_tokens: int, temperature: float

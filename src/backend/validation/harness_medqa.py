@@ -243,39 +243,56 @@ async def validate_medqa(
         correct_answer = case.ground_truth["correct_answer"]
 
         if report:
-            # Top-1 accuracy
-            found_top1, rank = diagnosis_in_differential(correct_answer, report, top_n=1)
+            # Top-1 accuracy (differential only)
+            found_top1, rank1, loc1 = diagnosis_in_differential(correct_answer, report, top_n=1)
             scores["top1_accuracy"] = 1.0 if found_top1 else 0.0
 
-            # Top-3 accuracy
-            found_top3, rank3 = diagnosis_in_differential(correct_answer, report, top_n=3)
+            # Top-3 accuracy (differential only)
+            found_top3, rank3, loc3 = diagnosis_in_differential(correct_answer, report, top_n=3)
             scores["top3_accuracy"] = 1.0 if found_top3 else 0.0
 
-            # Mentioned anywhere
-            found_any, rank_any = diagnosis_in_differential(correct_answer, report)
+            # Mentioned anywhere (differential + next_steps + recommendations + fulltext)
+            found_any, rank_any, loc_any = diagnosis_in_differential(correct_answer, report)
             scores["mentioned_accuracy"] = 1.0 if found_any else 0.0
+
+            # Differential-only accuracy (strict: only counts differential matches)
+            found_diff_only, rank_diff, loc_diff = diagnosis_in_differential(correct_answer, report)
+            scores["differential_accuracy"] = 1.0 if (found_diff_only and loc_diff == "differential") else 0.0
 
             # Parse success
             scores["parse_success"] = 1.0
 
+            # Rich details for debugging
+            all_dx = [dx.diagnosis for dx in report.differential_diagnosis]
+            all_next = [a.action for a in report.suggested_next_steps]
+            all_recs = list(report.guideline_recommendations)
+
             details = {
                 "correct_answer": correct_answer,
-                "top_diagnosis": report.differential_diagnosis[0].diagnosis if report.differential_diagnosis else "NONE",
+                "top_diagnosis": all_dx[0] if all_dx else "NONE",
+                "all_diagnoses": all_dx,
+                "all_next_steps": all_next[:5],
+                "all_recommendations": all_recs[:5],
                 "num_diagnoses": len(report.differential_diagnosis),
                 "found_at_rank": rank_any if found_any else -1,
+                "match_location": loc_any,
+                "patient_summary": report.patient_summary[:300] if report.patient_summary else "",
             }
 
-            status_icon = "✓" if found_top3 else "✗"
-            print(f"{status_icon} top1={'Y' if found_top1 else 'N'} top3={'Y' if found_top3 else 'N'} ({elapsed_ms}ms)")
+            # Richer console output
+            loc_tag = f"[{loc_any}]" if found_any else ""
+            status_icon = "+" if found_any else "-"
+            print(f"{status_icon} top1={'Y' if found_top1 else 'N'} top3={'Y' if found_top3 else 'N'} diff={'Y' if loc_any=='differential' else 'N'} {loc_tag} ({elapsed_ms}ms)")
         else:
             scores = {
                 "top1_accuracy": 0.0,
                 "top3_accuracy": 0.0,
                 "mentioned_accuracy": 0.0,
+                "differential_accuracy": 0.0,
                 "parse_success": 0.0,
             }
-            details = {"correct_answer": correct_answer, "error": error}
-            print(f"✗ FAILED: {error[:80] if error else 'unknown'}")
+            details = {"correct_answer": correct_answer, "error": error, "match_location": "not_found"}
+            print(f"- FAILED: {error[:80] if error else 'unknown'}")
 
         result = ValidationResult(
             case_id=case.case_id,
@@ -300,7 +317,7 @@ async def validate_medqa(
     successful = sum(1 for r in results if r.success)
 
     # Average each metric across successful cases only
-    metric_names = ["top1_accuracy", "top3_accuracy", "mentioned_accuracy", "parse_success"]
+    metric_names = ["top1_accuracy", "top3_accuracy", "mentioned_accuracy", "differential_accuracy", "parse_success"]
     metrics = {}
     for m in metric_names:
         values = [r.scores.get(m, 0.0) for r in results]

@@ -28,7 +28,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.agent.orchestrator import Orchestrator
-from app.models.schemas import CaseSubmission, CDSReport, AgentState
+from app.models.schemas import CaseSubmission, CDSReport, AgentState, AgentStepStatus
 
 
 # ──────────────────────────────────────────────
@@ -103,7 +103,20 @@ async def run_cds_pipeline(
         async for _step_update in orchestrator.run(case):
             pass  # consume all step updates
 
-        return orchestrator.state, orchestrator.get_result(), None
+        report = orchestrator.get_result()
+
+        # If no report was produced, collect errors from failed steps
+        if report is None and orchestrator.state:
+            failed_steps = [
+                s for s in orchestrator.state.steps
+                if s.status == AgentStepStatus.FAILED
+            ]
+            if failed_steps:
+                error_msgs = [f"{s.step_id}: {s.error}" for s in failed_steps]
+                return orchestrator.state, None, "; ".join(error_msgs)
+            return orchestrator.state, None, "Pipeline completed but produced no report"
+
+        return orchestrator.state, report, None
     except asyncio.TimeoutError:
         return orchestrator.state, None, f"Pipeline timed out after {timeout_sec}s"
     except Exception as e:
@@ -159,12 +172,14 @@ def diagnosis_in_differential(
     target_diagnosis: str,
     report: CDSReport,
     top_n: Optional[int] = None,
-) -> tuple[bool, int]:
+) -> tuple[bool, int, str]:
     """
     Check if target_diagnosis appears in the report's differential.
 
     Returns:
-        (found, rank) — rank is 0-indexed position, or -1 if not found
+        (found, rank, match_location) — rank is 0-indexed position, or -1 if not found.
+        match_location is one of: "differential", "next_steps", "recommendations",
+        "fulltext", or "not_found".
     """
     diagnoses = report.differential_diagnosis
     if top_n:
@@ -172,18 +187,29 @@ def diagnosis_in_differential(
 
     for i, dx in enumerate(diagnoses):
         if fuzzy_match(dx.diagnosis, target_diagnosis):
-            return True, i
+            return True, i, "differential"
 
-    # Also check the full report text (patient_summary, guideline_recommendations, etc.)
+    # Check suggested_next_steps (for management-type answers)
+    for i, action in enumerate(report.suggested_next_steps):
+        if fuzzy_match(action.action, target_diagnosis):
+            return True, len(diagnoses) + i, "next_steps"
+
+    # Check guideline recommendations (for treatment-type answers)
+    for i, rec in enumerate(report.guideline_recommendations):
+        if fuzzy_match(rec, target_diagnosis):
+            return True, len(diagnoses) + len(report.suggested_next_steps) + i, "recommendations"
+
+    # Broad fulltext check (patient_summary, recommendations, next steps combined)
     full_text = " ".join([
         report.patient_summary or "",
         " ".join(report.guideline_recommendations),
         " ".join(a.action for a in report.suggested_next_steps),
+        " ".join(dx.reasoning for dx in report.differential_diagnosis),
     ])
     if fuzzy_match(full_text, target_diagnosis, threshold=0.3):
-        return True, len(diagnoses)  # found but not in differential
+        return True, len(diagnoses), "fulltext"
 
-    return False, -1
+    return False, -1, "not_found"
 
 
 # ──────────────────────────────────────────────
