@@ -8,7 +8,7 @@ Jan 13 ─────────────────────── Feb
  ◄────── Build & Iterate ──────►
 ```
 
-**⏰ Days remaining as of Feb 13, 2026: ~11 days**
+**⏰ Days remaining as of Feb 15, 2026: ~9 days**
 
 ---
 

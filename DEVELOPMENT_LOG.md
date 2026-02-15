@@ -258,9 +258,10 @@ All config via `.env` (template in `.env.template`):
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `MEDGEMMA_API_KEY` | Yes | — | Google AI Studio API key |
-| `MEDGEMMA_BASE_URL` | No | `https://generativelanguage.googleapis.com/v1beta/openai/` | LLM endpoint |
-| `MEDGEMMA_MODEL_ID` | No | `gemma-3-27b-it` | Model identifier |
+| `MEDGEMMA_API_KEY` | Yes | — | HuggingFace API token or Google AI Studio API key |
+| `MEDGEMMA_BASE_URL` | No | `""` (empty) | LLM endpoint (HF Endpoint URL/v1 or Google AI Studio URL) |
+| `MEDGEMMA_MODEL_ID` | No | `google/medgemma` | Model identifier (`tgi` for HF Endpoints, or full model name) |
+| `HF_TOKEN` | No | `""` | HuggingFace token for dataset downloads |
 | `CHROMA_PERSIST_DIR` | No | `./data/chroma` | ChromaDB storage |
 | `EMBEDDING_MODEL` | No | `sentence-transformers/all-MiniLM-L6-v2` | RAG embeddings |
 | `MAX_GUIDELINES` | No | `5` | Guidelines per RAG query |
@@ -311,6 +312,104 @@ Full validation runs (50–100+ cases) are planned for the next session.
 
 **Files created:** `validation/__init__.py`, `validation/base.py`, `validation/harness_medqa.py`, `validation/harness_mtsamples.py`, `validation/harness_pmc.py`, `validation/run_validation.py`  
 **Files modified:** `.gitignore` (added `validation/data/` and `validation/results/`)
+
+---
+
+## Phase 11: MedGemma HuggingFace Dedicated Endpoint
+
+### Motivation
+
+The competition requires using HAI-DEF models (MedGemma). Google AI Studio served `gemma-3-27b-it` for development, but for the final submission we needed the actual `google/medgemma-27b-text-it` model. HuggingFace Dedicated Endpoints provide an OpenAI-compatible TGI server with scale-to-zero billing.
+
+### Deployment
+
+- **Endpoint name:** `medgemma-27b-cds`
+- **Model:** `google/medgemma-27b-text-it`
+- **Instance:** 1× NVIDIA A100 80 GB (AWS `us-east-1`)
+- **Container:** Text Generation Inference (TGI) with `DTYPE=bfloat16`
+- **Scale-to-zero:** Enabled (15 min idle timeout)
+- **Cost:** ~$2.50/hr when running
+
+### Key Configuration
+
+After initial deployment, the default TGI token limits (`MAX_INPUT_TOKENS=4096`) caused 422 errors on longer synthesis prompts. Updated endpoint environment:
+
+- `MAX_INPUT_TOKENS=12288`
+- `MAX_TOTAL_TOKENS=16384`
+
+Also reduced per-step `max_tokens` to stay within limits:
+- `patient_parser.py`: 1500
+- `clinical_reasoning.py`: 3072
+- `conflict_detection.py`: 2000
+- `synthesis.py`: 3000
+
+### Code Changes
+
+- **`medgemma.py`:** Updated to send `role: "system"` natively (TGI supports it), with automatic fallback to folding system prompt into user message for Google AI Studio compatibility.
+- **`.env`:** Updated `MEDGEMMA_BASE_URL` to HF endpoint URL, `MEDGEMMA_API_KEY` to HF token, `MEDGEMMA_MODEL_ID=tgi`.
+- **`.env.template`:** Updated with MedGemma model name and HF Endpoint instructions.
+
+### Verification
+
+Single-case test: Chikungunya question → correct diagnosis appeared at rank 5 in differential. All 6 pipeline steps completed in 281s.
+
+**Deployment guide:** `docs/deploy_medgemma_hf.md`
+
+---
+
+## Phase 12: 50-Case MedQA Validation
+
+### Setup
+
+Ran 50 MedQA (USMLE) cases through the full pipeline using the MedGemma HF Endpoint:
+
+```bash
+cd src/backend
+python -m validation.run_validation --medqa --max-cases 50 --seed 42 --delay 2
+```
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Cases run | 50 |
+| Pipeline success | 94% (47/50) |
+| Top-1 diagnostic accuracy | 36% |
+| Top-3 diagnostic accuracy | 38% |
+| Differential accuracy | 10% |
+| Mentioned in report | 38% |
+| Avg pipeline time | 204 s/case |
+| Total run time | ~60 min |
+
+### Question Type Breakdown
+
+Used `analyze_results.py` to categorize the 50 cases:
+
+| Type | Count | Mentioned | Differential |
+|------|-------|-----------|-------------|
+| Diagnostic | 36 | 14 (39%) | 5 (14%) |
+| Treatment | 6 | — | — |
+| Pathophysiology | 6 | — | — |
+| Statistics | 1 | — | — |
+| Anatomy | 1 | — | — |
+
+### Key Observations
+
+1. **MedQA includes many non-diagnostic questions** (treatment, mechanism, stats) that the CDS pipeline is not designed to answer — it generates differential diagnoses, not multiple-choice answers.
+2. **On diagnostic questions specifically**, 39% mentioned accuracy is reasonable for a pipeline that wasn't optimized for exam-style questions.
+3. **Pipeline failures (3/50)** were caused by the HF endpoint scaling to zero mid-run. The `--resume` flag successfully continued from the checkpoint.
+4. **Improved clinical reasoning prompt** to demand disease-level diagnoses rather than symptom categories (e.g., "Chikungunya" not "viral arthritis").
+
+### Infrastructure Improvements
+
+- **Incremental JSONL checkpoints:** Each case result is appended to `medqa_checkpoint.jsonl` as it completes.
+- **`--resume` flag:** Skips already-completed cases, enabling graceful recovery from endpoint failures.
+- **`check_progress.py`:** Utility to monitor checkpoint progress during long runs.
+- **`analyze_results.py`:** Categorizes MedQA results by question type for more meaningful accuracy analysis.
+- **Unicode fixes:** Replaced box-drawing characters (`╔═╗║╚╝`) and symbols (`✓✗─`) with ASCII equivalents for Windows console compatibility.
+
+**Files created:** `validation/analyze_results.py`, `validation/check_progress.py`  
+**Files modified:** `validation/base.py`, `validation/harness_medqa.py`, `validation/run_validation.py`, `app/tools/clinical_reasoning.py`, `app/tools/synthesis.py`, `app/tools/conflict_detection.py`, `app/tools/patient_parser.py`
 
 ---
 

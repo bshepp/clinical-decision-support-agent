@@ -2,11 +2,12 @@
 Agent Orchestrator — the brain of the CDS Agent.
 
 Controls the multi-step pipeline:
-  1. Parse patient data
-  2. Clinical reasoning (MedGemma)
-  3. Drug interaction check
-  4. Guideline retrieval (RAG)
-  5. Synthesis (MedGemma)
+  1. Parse patient data (MedGemma)
+  2. Clinical reasoning / differential diagnosis (MedGemma)
+  3. Drug interaction check (OpenFDA + RxNorm APIs)
+  4. Guideline retrieval (RAG over ChromaDB)
+  5. Conflict detection (MedGemma)
+  6. Synthesis into CDS report (MedGemma)
 
 Each step is a tool call. The orchestrator manages state, handles errors,
 and streams step updates to the frontend via a callback.

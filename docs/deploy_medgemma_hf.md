@@ -35,10 +35,14 @@ OpenAI-compatible API.
    - GCP: ~$3.60/hr
 6. **Container type**: Text Generation Inference (TGI) — this is the default.
 7. **Advanced Settings**:
-   - **Max Input Length**: `32768`
-   - **Max Total Tokens**: `40960`
+   - **Max Input Length**: `12288` (default 4096 is too small for synthesis prompts)
+   - **Max Total Tokens**: `16384`
    - **Quantization**: `none` (bfloat16 fits in 80 GB)
    - **Scale-to-zero**: **Enable** (idle timeout: 15 min recommended)
+
+   > **Note:** The default TGI `MAX_INPUT_TOKENS=4096` will cause 422 errors
+   > on longer pipeline prompts (especially synthesis). We found `12288` /
+   > `16384` to be sufficient for all 6 pipeline steps.
 8. Click **Create Endpoint**.
 
 ### 2. Wait for the endpoint to become ready

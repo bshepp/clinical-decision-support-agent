@@ -97,6 +97,20 @@ A validation framework tests the pipeline against real-world clinical datasets:
 
 Initial smoke test (3 MedQA cases): 100% parse success, 66.7% top-1 diagnostic accuracy.
 
+**50-case MedQA validation (MedGemma 27B via HF Endpoint):**
+
+| Metric | Value |
+|--------|-------|
+| Cases run | 50 |
+| Pipeline success | 94% (47/50) |
+| Top-1 diagnostic accuracy | 36% |
+| Top-3 diagnostic accuracy | 38% |
+| Differential accuracy | 10% |
+| Mentioned in report | 38% |
+| Avg pipeline time | 204 s/case |
+
+Of the 50 cases, 36 were diagnostic questions — on those, 39% mentioned the correct diagnosis and 14% placed it in the differential.
+
 See [docs/test_results.md](docs/test_results.md) for full details and reproduction steps.
 
 ---
@@ -137,7 +151,8 @@ medgemma_impact_challenge/
 ├── docs/
 │   ├── architecture.md                 # System architecture & design decisions
 │   ├── test_results.md                 # Detailed test results & benchmarks
-│   └── writeup_draft.md               # Project writeup / summary
+│   ├── writeup_draft.md               # Project writeup / summary
+│   └── deploy_medgemma_hf.md          # MedGemma HF Endpoint deployment guide
 ├── src/
 │   ├── backend/                        # Python FastAPI backend
 │   │   ├── .env.template              # Environment config template
@@ -152,7 +167,9 @@ medgemma_impact_challenge/
 │   │   │   ├── harness_medqa.py      # MedQA (USMLE) diagnostic accuracy harness
 │   │   │   ├── harness_mtsamples.py  # MTSamples parse quality harness
 │   │   │   ├── harness_pmc.py        # PMC Case Reports diagnostic harness
-│   │   │   └── run_validation.py     # Unified CLI runner
+│   │   │   ├── run_validation.py     # Unified CLI runner
+│   │   │   ├── analyze_results.py    # Question-type categorization & analysis
+│   │   │   └── check_progress.py     # Checkpoint progress monitor
 │   │   └── app/
 │   │       ├── main.py               # FastAPI entry (CORS, routers, lifespan)
 │   │       ├── config.py             # Pydantic Settings (ports, models, dirs)
@@ -204,7 +221,7 @@ medgemma_impact_challenge/
 
 - **Python 3.10+** (tested with Python 3.10)
 - **Node.js 18+** (tested with Node.js 18)
-- **API Key:** Google AI Studio API key for Gemma model access
+- **API Key:** HuggingFace API token (for MedGemma endpoint) or Google AI Studio API key
 
 ### Backend Setup
 
@@ -221,7 +238,9 @@ pip install -r requirements.txt
 
 # Configure environment
 copy .env.template .env        # Windows (or: cp .env.template .env)
-# Edit .env — set MEDGEMMA_API_KEY to your Google AI Studio key
+# Edit .env — set MEDGEMMA_API_KEY and MEDGEMMA_BASE_URL
+# For HF Endpoints: see docs/deploy_medgemma_hf.md
+# For Google AI Studio: set MEDGEMMA_API_KEY to your Google AI Studio key
 
 # Start the backend
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -281,7 +300,7 @@ python -m validation.run_validation --all --max-cases 10   # All 3 datasets
 |-------|-----------|---------|
 | Frontend | Next.js 14, React 18, TypeScript, Tailwind CSS | Patient input, pipeline visualization, report display |
 | API | FastAPI, WebSocket, Pydantic v2 | REST endpoints + real-time streaming |
-| LLM | Gemma 3 27B IT (via Google AI Studio) | Clinical reasoning + synthesis |
+| LLM | MedGemma 27B Text IT (via HuggingFace Dedicated Endpoint) | Clinical reasoning + synthesis |
 | RAG | ChromaDB, sentence-transformers (all-MiniLM-L6-v2) | Clinical guideline retrieval |
 | Drug Data | OpenFDA API, RxNorm / NLM API | Drug interactions, medication normalization |
 | Validation | Pydantic | Structured output validation across all pipeline steps |
@@ -326,6 +345,7 @@ curl -X POST http://localhost:8000/api/cases/submit \
 | [SECURITY.md](SECURITY.md) | Security policy and responsible disclosure |
 | [TODO.md](TODO.md) | Next-session action items and project state |
 | [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md) | Competition submission strategy |
+| [docs/deploy_medgemma_hf.md](docs/deploy_medgemma_hf.md) | MedGemma HuggingFace Endpoint deployment guide |
 
 ---
 

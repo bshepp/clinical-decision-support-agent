@@ -50,8 +50,8 @@ structured clinical decision support report — all in seconds.
 │                                    └─────────────────┘           │
 └──────────────────────────────────────────────────────────────────┘
 
-LLM: gemma-3-27b-it via Google AI Studio
-     (OpenAI-compatible endpoint)
+LLM: google/medgemma-27b-text-it via HuggingFace Dedicated Endpoint
+     (OpenAI-compatible TGI, 1× A100 80 GB, bfloat16)
 ```
 
 ---
@@ -138,17 +138,18 @@ LLM: gemma-3-27b-it via Google AI Studio
 
 ### Model Configuration
 
-- **Model:** `gemma-3-27b-it`
-- **API:** Google AI Studio (OpenAI-compatible endpoint)
-- **Base URL:** `https://generativelanguage.googleapis.com/v1beta/openai/`
+- **Model:** `google/medgemma-27b-text-it` (MedGemma from HAI-DEF)
+- **API:** HuggingFace Dedicated Endpoint (TGI), with Google AI Studio as fallback
+- **Base URL:** `https://lisvpf8if1yhgxn2.us-east-1.aws.endpoints.huggingface.cloud/v1` (HF Endpoint)
 - **Client:** OpenAI Python SDK (`openai==1.51.0`)
 - **Service:** `medgemma.py` wraps all LLM calls
+- **Endpoint config:** `MAX_INPUT_TOKENS=12288`, `MAX_TOTAL_TOKENS=16384`, `DTYPE=bfloat16`
 
-### Gemma System Prompt Workaround
+### Gemma System Prompt Handling
 
-**Problem discovered during development:** Gemma models accessed via the Google AI Studio OpenAI-compatible endpoint return a 400 error if you include a `role: "system"` message. The API does not support the system role.
+**MedGemma via TGI** natively supports `role: "system"` messages, so we send system/user messages properly.
 
-**Solution implemented:** `medgemma.py`'s `_generate_api` method detects system messages and folds them into the first user message with a `[System Instructions]` prefix:
+**Fallback for Google AI Studio:** If the backend happens to be plain Gemma on Google AI Studio (which rejects the system role), the code automatically catches the error and falls back to folding the system prompt into the first user message:
 
 ```python
 # If system message exists, fold it into the first user message
@@ -225,7 +226,8 @@ All pipeline data is strongly typed via Pydantic models in `schemas.py` (~280 li
 
 | API | Purpose | Authentication | Rate Limits |
 |-----|---------|---------------|-------------|
-| Google AI Studio | Gemma 3 27B IT LLM inference | API key | Per-key quota |
+| HuggingFace Dedicated Endpoint | MedGemma 27B Text IT LLM inference | HF API token | Dedicated GPU (no shared limits) |
+| Google AI Studio (fallback) | Gemma 3 27B IT LLM inference | API key | Per-key quota |
 | OpenFDA | Drug adverse event data | None (public) | 240 req/min (with key), 40/min (without) |
 | RxNorm / NLM | Drug normalization (name → RxCUI), pairwise interactions | None (public) | 20 req/sec |
 
@@ -269,9 +271,10 @@ All configuration lives in `config.py` (Pydantic Settings) and `.env`:
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| `MEDGEMMA_API_KEY` | (required) | Google AI Studio API key |
-| `MEDGEMMA_BASE_URL` | `https://generativelanguage.googleapis.com/v1beta/openai/` | LLM API endpoint |
-| `MEDGEMMA_MODEL_ID` | `gemma-3-27b-it` | Model identifier |
+| `MEDGEMMA_API_KEY` | (required) | HuggingFace API token or Google AI Studio API key |
+| `MEDGEMMA_BASE_URL` | `""` (empty) | LLM API endpoint (HF Endpoint URL with /v1, or Google AI Studio URL) |
+| `MEDGEMMA_MODEL_ID` | `google/medgemma` | Model identifier (`tgi` for HF Endpoints, or full model name) |
+| `HF_TOKEN` | `""` | HuggingFace token for dataset downloads |
 | `CHROMA_PERSIST_DIR` | `./data/chroma` | ChromaDB storage directory |
 | `EMBEDDING_MODEL` | `sentence-transformers/all-MiniLM-L6-v2` | Embedding model for RAG |
 | `MAX_GUIDELINES` | `5` | Number of guidelines to retrieve per query |
@@ -283,7 +286,7 @@ All configuration lives in `config.py` (Pydantic Settings) and `.env`:
 
 - **LLM latency:** Full pipeline takes ~75 s due to multiple sequential LLM calls. Could be improved with smaller models or parallel LLM calls.
 - **No authentication:** No user auth — designed as a local demo / research tool.
-- **Single-model:** Uses only Gemma 3 27B IT. Could benefit from specialized models for different steps.
+- **Single-model:** Uses only MedGemma 27B Text IT. Could benefit from specialized models for different steps.
 - **Guideline currency:** Guidelines are a static snapshot. A production system would need automated updates.
 - **No EHR integration:** Input is manual text paste. A production system would integrate with EHR FHIR APIs.
 

@@ -1,6 +1,6 @@
 # Test Results — CDS Agent
 
-> Last updated after RAG expansion to 62 guidelines across 14 specialties.
+> Last updated after 50-case MedQA validation with MedGemma 27B via HuggingFace Dedicated Endpoint.
 
 ---
 
@@ -221,7 +221,34 @@ Tests use only the standard library + `httpx` (for REST calls) and the backend's
 | Top-3 diagnostic accuracy | 66.7% (2/3) |
 | Avg pipeline time | ~94 s per case |
 
-> **Note:** This is a smoke test only. A full validation run (50–100 cases per dataset) is planned but takes ~45 min per dataset.
+### 50-Case MedQA Validation (MedGemma 27B Text IT via HF Endpoint)
+
+Run with: `python -m validation.run_validation --medqa --max-cases 50 --seed 42 --delay 2`
+
+| Metric | Value |
+|--------|-------|
+| Cases run | 50 |
+| Pipeline success | 94% (47/50) |
+| Top-1 diagnostic accuracy | 36% |
+| Top-3 diagnostic accuracy | 38% |
+| Differential accuracy | 10% |
+| Mentioned in report | 38% |
+| Avg pipeline time | 204 s per case |
+| Total run time | ~60 min |
+
+**Breakdown by question type (50 cases):**
+
+| Type | Count | Mentioned | Differential |
+|------|-------|-----------|-------------|
+| Diagnostic | 36 | 14 (39%) | 5 (14%) |
+| Treatment | 6 | — | — |
+| Pathophysiology | 6 | — | — |
+| Statistics | 1 | — | — |
+| Anatomy | 1 | — | — |
+
+> **Notes:** MedQA questions include many non-diagnostic question types (treatment selection, mechanism of action, etc.) which the CDS pipeline is not designed to answer. On diagnostic-only questions, the pipeline mentioned the correct diagnosis 39% of the time. Pipeline failures (3/50) were due to HF endpoint scale-to-zero mid-run.
+
+> Full validation was run on Feb 15, 2026 using the `medgemma-27b-cds` HuggingFace Dedicated Endpoint (1× A100 80 GB, bfloat16). Incremental checkpoints saved to `validation/results/medqa_checkpoint.jsonl` with `--resume` support.
 
 ### How to Reproduce
 

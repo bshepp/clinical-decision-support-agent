@@ -107,6 +107,8 @@ No fine-tuning was performed in the current version. The base MedGemma model (`m
 | RAG retrieval quality | 30/30 queries passed (100%), avg relevance 0.639 |
 | Clinical test suite | 22 scenarios across 14 specialties |
 | Top-1 RAG accuracy | 100% — correct guideline ranked #1 for all queries |
+| **MedQA 50-case validation** | **36% top-1, 38% top-3, 38% mentioned, 94% pipeline success** |
+| MedQA diagnostic-only (36 cases) | 39% mentioned, 14% differential |
 
 **Application stack:**
 
@@ -121,7 +123,7 @@ No fine-tuning was performed in the current version. The base MedGemma model (`m
 **Deployment considerations:**
 
 - **HIPAA compliance:** MedGemma is an open-weight model that can be self-hosted on-premises, eliminating the need to send patient data to external APIs. This is critical for healthcare deployment.
-- **Latency:** Current pipeline takes ~75 s end-to-end. For production, this could be reduced with: smaller/distilled models, parallel LLM calls, or GPU-accelerated inference.
+- **Latency:** Current pipeline takes ~75 s for a single E2E case (local), or ~204 s avg on the HuggingFace Dedicated Endpoint (50-case MedQA validation). For production, this could be reduced with: smaller/distilled models, parallel LLM calls, or GPU-accelerated inference with higher throughput.
 - **Scalability:** FastAPI + uvicorn supports async request handling. For high-throughput deployment, add worker processes and a task queue (e.g., Celery).
 - **EHR integration:** Current input is manual text paste. A production system would integrate with EHR systems via FHIR APIs for automatic patient data extraction.
 
@@ -139,7 +141,7 @@ The validation harness calls the `Orchestrator` directly (no HTTP server), enabl
 
 **Initial smoke test (3 MedQA cases):** 100% parse success, 66.7% top-1 diagnostic accuracy, ~94 s avg per case.
 
-Full-scale validation (50–100+ cases per dataset) is in progress.
+**50-case MedQA validation (MedGemma 27B via HF Endpoint):** 94% pipeline success, 36% top-1 diagnostic accuracy, 38% mentioned in report, 204 s avg per case. On diagnostic-only questions (36/50), 39% mentioned the correct diagnosis. Full results in [docs/test_results.md](docs/test_results.md).
 
 **Practical usage:**
 

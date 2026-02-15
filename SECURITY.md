@@ -37,12 +37,12 @@ We will acknowledge receipt within 48 hours and aim to provide a fix or mitigati
 - This system processes clinical text that could contain protected health information (PHI)
 - **No real patient data should ever be used** with this demonstration system
 - In a production deployment, HIPAA compliance would require: encrypted storage, audit logging, access controls, and BAAs with all third-party services
-- The Gemma model can be self-hosted on-premises to avoid sending data to external APIs
+- The MedGemma model can be self-hosted on-premises to avoid sending data to external APIs
 
 ### API Keys
 
-- The Google AI Studio API key is stored in `.env` (gitignored)
-- Never commit `.env` or any file containing API keys
+- API keys/tokens (HuggingFace token, Google AI Studio key) are stored in `.env` (gitignored)
+- Never commit `.env` or any file containing API keys or tokens
 - The `.env.template` file shows required variables without actual values
 
 ### LLM-Specific Risks
