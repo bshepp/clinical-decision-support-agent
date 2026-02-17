@@ -1,0 +1,31 @@
+{
+  "dataset": "trackC_C0_2rounds",
+  "total_cases": 1,
+  "successful_cases": 0,
+  "failed_cases": 1,
+  "metrics": {
+    "top1_accuracy": 0.0,
+    "top3_accuracy": 0.0,
+    "mentioned": 0.0,
+    "baseline_top1": 0.0,
+    "baseline_mentioned": 0.0,
+    "pipeline_success": 0.0,
+    "avg_iterations": 0.0,
+    "improvement_rate": 0.0
+  },
+  "run_duration_sec": 5.8,
+  "timestamp": "2026-02-16T16:51:14.393903+00:00",
+  "per_case": [
+    {
+      "case_id": "medqa_1",
+      "source_dataset": "trackC_C0_2rounds",
+      "success": false,
+      "scores": {},
+      "pipeline_time_ms": 5792,
+      "step_results": {},
+      "report_summary": null,
+      "error": "parse: Error code: 503 - {'error': '503 Service Unavailable', 'code': 'SERVICE_UNAVAILABLE'}; reason: Patient profile not available \u2014 parse step must run first; drugs: Patient profile not available; guidelines: Clinical reasoning not available; synthesize: Error code: 503 - {'error': '503 Service Unavailable', 'code': 'SERVICE_UNAVAILABLE'}",
+      "details": {}
+    }
+  ]
+}

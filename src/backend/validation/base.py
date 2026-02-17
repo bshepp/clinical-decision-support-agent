@@ -28,7 +28,13 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app.agent.orchestrator import Orchestrator
-from app.models.schemas import CaseSubmission, CDSReport, AgentState, AgentStepStatus
+from app.models.schemas import (
+    CaseSubmission,
+    CDSReport,
+    ClinicalReasoningResult,
+    AgentState,
+    AgentStepStatus,
+)
 
 
 # ──────────────────────────────────────────────
@@ -132,40 +138,64 @@ def normalize_text(text: str) -> str:
     text = text.lower().strip()
     text = re.sub(r'[^\w\s]', ' ', text)
     text = re.sub(r'\s+', ' ', text)
-    return text
+    return text.strip()
+
+
+# Medical stopwords that don't carry diagnostic meaning
+_MEDICAL_STOPWORDS = frozenset({
+    "the", "a", "an", "of", "in", "to", "and", "or", "is", "are", "was",
+    "were", "be", "been", "with", "for", "on", "at", "by", "from", "this",
+    "that", "these", "those", "it", "its", "has", "have", "had", "do",
+    "does", "did", "will", "would", "could", "should", "may", "might",
+    "most", "likely", "following", "which", "what", "patient", "patients",
+})
+
+
+def _content_tokens(text: str) -> set:
+    """Extract meaningful content tokens, removing medical stopwords."""
+    tokens = set(normalize_text(text).split())
+    return tokens - _MEDICAL_STOPWORDS
 
 
 def fuzzy_match(candidate: str, target: str, threshold: float = 0.6) -> bool:
     """
     Check if candidate text is a fuzzy match for target.
 
-    Uses token overlap (Jaccard-like) rather than edit distance —
-    medical terms are long and we care about semantic overlap, not typos.
+    Strategy (checked in order, first match wins):
+      1. Normalized substring containment (either direction)
+      2. All content tokens of target appear in candidate (recall=1.0)
+      3. Token overlap ratio >= threshold (using content tokens, recall-based)
 
     Args:
-        candidate: Text from the pipeline output
-        target: Ground truth text
-        threshold: Minimum token overlap ratio (0.0–1.0)
+        candidate: Text from the pipeline output (may be long)
+        target: Ground truth text (usually short)
+        threshold: Minimum token overlap ratio (0.0-1.0)
     """
-    c_tokens = set(normalize_text(candidate).split())
-    t_tokens = set(normalize_text(target).split())
+    c_norm = normalize_text(candidate)
+    t_norm = normalize_text(target)
 
-    if not t_tokens:
+    if not t_norm:
         return False
 
-    # If target is a substring of candidate (or vice versa), that's a match
-    if normalize_text(target) in normalize_text(candidate):
-        return True
-    if normalize_text(candidate) in normalize_text(target):
+    # 1. Substring containment (either direction)
+    if t_norm in c_norm or c_norm in t_norm:
         return True
 
-    # Token overlap
-    overlap = len(c_tokens & t_tokens)
-    denominator = min(len(c_tokens), len(t_tokens))
-    if denominator == 0:
+    # 2. All content tokens of target present in candidate
+    t_content = _content_tokens(target)
+    c_content = _content_tokens(candidate)
+
+    if t_content and t_content.issubset(c_content):
+        return True
+
+    # 3. Token overlap ratio (recall-based: what fraction of target is present?)
+    if not t_content or not c_content:
         return False
 
-    return (overlap / denominator) >= threshold
+    overlap = len(t_content & c_content)
+    recall = overlap / len(t_content)
+
+    return recall >= threshold
 
 
 def diagnosis_in_differential(
@@ -210,6 +240,247 @@ def diagnosis_in_differential(
         return True, len(diagnoses), "fulltext"
 
     return False, -1, "not_found"
+
+
+# ──────────────────────────────────────────────
+# Type-aware scoring (P4)
+# ──────────────────────────────────────────────
+
+def score_case(
+    target_answer: str,
+    report: CDSReport,
+    question_type: str = "diagnostic",
+    reasoning_result: Optional[ClinicalReasoningResult] = None,
+) -> dict:
+    """
+    Score a case based on its question type.
+
+    Returns a dict of metric_name -> score (0.0 or 1.0), plus
+    'match_location' (str) and 'match_rank' (int) detail fields.
+    """
+    qt = question_type.lower()
+
+    if qt == "diagnostic":
+        return _score_diagnostic(target_answer, report)
+    elif qt == "treatment":
+        return _score_treatment(target_answer, report)
+    elif qt == "mechanism":
+        return _score_mechanism(target_answer, report, reasoning_result)
+    elif qt == "lab_finding":
+        return _score_lab_finding(target_answer, report, reasoning_result)
+    else:
+        return _score_generic(target_answer, report, reasoning_result)
+
+
+def _score_diagnostic(target: str, report: CDSReport) -> dict:
+    """Score a diagnostic question -- primary field is differential_diagnosis."""
+    found_top1, r1, l1 = diagnosis_in_differential(target, report, top_n=1)
+    found_top3, r3, l3 = diagnosis_in_differential(target, report, top_n=3)
+    found_any, ra, la = diagnosis_in_differential(target, report)
+
+    return {
+        "top1_accuracy": 1.0 if found_top1 else 0.0,
+        "top3_accuracy": 1.0 if found_top3 else 0.0,
+        "mentioned_accuracy": 1.0 if found_any else 0.0,
+        "differential_accuracy": 1.0 if (found_any and la == "differential") else 0.0,
+        "match_location": la,
+        "match_rank": ra,
+    }
+
+
+def _score_treatment(target: str, report: CDSReport) -> dict:
+    """Score a treatment question -- primary fields are next_steps + recommendations."""
+    # Check suggested_next_steps first (most specific for treatment)
+    for i, action in enumerate(report.suggested_next_steps):
+        if fuzzy_match(action.action, target):
+            return {
+                "top1_accuracy": 1.0 if i == 0 else 0.0,
+                "top3_accuracy": 1.0 if i < 3 else 0.0,
+                "mentioned_accuracy": 1.0,
+                "differential_accuracy": 0.0,
+                "match_location": "next_steps",
+                "match_rank": i,
+            }
+
+    # Check guideline_recommendations
+    for i, rec in enumerate(report.guideline_recommendations):
+        if fuzzy_match(rec, target):
+            return {
+                "top1_accuracy": 0.0,
+                "top3_accuracy": 0.0,
+                "mentioned_accuracy": 1.0,
+                "differential_accuracy": 0.0,
+                "match_location": "recommendations",
+                "match_rank": i,
+            }
+
+    # Check differential reasoning text (treatment may appear in reasoning)
+    for dx in report.differential_diagnosis:
+        if fuzzy_match(dx.reasoning, target, threshold=0.3):
+            return {
+                "top1_accuracy": 0.0,
+                "top3_accuracy": 0.0,
+                "mentioned_accuracy": 1.0,
+                "differential_accuracy": 0.0,
+                "match_location": "reasoning_text",
+                "match_rank": -1,
+            }
+
+    # Fulltext fallback
+    full_text = _build_fulltext(report)
+    if fuzzy_match(full_text, target, threshold=0.3):
+        return {
+            "top1_accuracy": 0.0,
+            "top3_accuracy": 0.0,
+            "mentioned_accuracy": 1.0,
+            "differential_accuracy": 0.0,
+            "match_location": "fulltext",
+            "match_rank": -1,
+        }
+
+    return _not_found()
+
+
+def _score_mechanism(
+    target: str,
+    report: CDSReport,
+    reasoning_result: Optional[ClinicalReasoningResult] = None,
+) -> dict:
+    """Score a mechanism question -- primary field is reasoning_chain."""
+    # Check reasoning chain from clinical reasoning step
+    if reasoning_result and reasoning_result.reasoning_chain:
+        if fuzzy_match(reasoning_result.reasoning_chain, target, threshold=0.3):
+            return {
+                "top1_accuracy": 0.0,
+                "top3_accuracy": 0.0,
+                "mentioned_accuracy": 1.0,
+                "differential_accuracy": 0.0,
+                "match_location": "reasoning_chain",
+                "match_rank": -1,
+            }
+
+    # Check differential reasoning text
+    for dx in report.differential_diagnosis:
+        if fuzzy_match(dx.reasoning, target, threshold=0.3):
+            return {
+                "top1_accuracy": 0.0,
+                "top3_accuracy": 0.0,
+                "mentioned_accuracy": 1.0,
+                "differential_accuracy": 0.0,
+                "match_location": "differential_reasoning",
+                "match_rank": -1,
+            }
+
+    # Fulltext fallback
+    full_text = _build_fulltext(report)
+    if fuzzy_match(full_text, target, threshold=0.3):
+        return {
+            "top1_accuracy": 0.0,
+            "top3_accuracy": 0.0,
+            "mentioned_accuracy": 1.0,
+            "differential_accuracy": 0.0,
+            "match_location": "fulltext",
+            "match_rank": -1,
+        }
+
+    return _not_found()
+
+
+def _score_lab_finding(
+    target: str,
+    report: CDSReport,
+    reasoning_result: Optional[ClinicalReasoningResult] = None,
+) -> dict:
+    """Score a lab/finding question -- primary field is recommended_workup."""
+    # Check recommended workup from clinical reasoning step
+    if reasoning_result:
+        for i, action in enumerate(reasoning_result.recommended_workup):
+            if fuzzy_match(action.action, target, threshold=0.4):
+                return {
+                    "top1_accuracy": 1.0 if i == 0 else 0.0,
+                    "top3_accuracy": 1.0 if i < 3 else 0.0,
+                    "mentioned_accuracy": 1.0,
+                    "differential_accuracy": 0.0,
+                    "match_location": "recommended_workup",
+                    "match_rank": i,
+                }
+
+    # Check next steps in final report
+    for i, action in enumerate(report.suggested_next_steps):
+        if fuzzy_match(action.action, target, threshold=0.4):
+            return {
+                "top1_accuracy": 0.0,
+                "top3_accuracy": 0.0,
+                "mentioned_accuracy": 1.0,
+                "differential_accuracy": 0.0,
+                "match_location": "next_steps",
+                "match_rank": i,
+            }
+
+    # Fulltext fallback
+    full_text = _build_fulltext(report)
+    if fuzzy_match(full_text, target, threshold=0.3):
+        return {
+            "top1_accuracy": 0.0,
+            "top3_accuracy": 0.0,
+            "mentioned_accuracy": 1.0,
+            "differential_accuracy": 0.0,
+            "match_location": "fulltext",
+            "match_rank": -1,
+        }
+
+    return _not_found()
+
+
+def _score_generic(
+    target: str,
+    report: CDSReport,
+    reasoning_result: Optional[ClinicalReasoningResult] = None,
+) -> dict:
+    """Score any question type -- searches all fields broadly."""
+    # Try diagnostic scoring first
+    result = _score_diagnostic(target, report)
+    if result.get("mentioned_accuracy", 0.0) > 0.0:
+        return result
+
+    # Try treatment scoring
+    result = _score_treatment(target, report)
+    if result.get("mentioned_accuracy", 0.0) > 0.0:
+        return result
+
+    # Try mechanism scoring
+    if reasoning_result:
+        result = _score_mechanism(target, report, reasoning_result)
+        if result.get("mentioned_accuracy", 0.0) > 0.0:
+            return result
+
+    return _not_found()
+
+
+def _build_fulltext(report: CDSReport) -> str:
+    """Concatenate all report fields into a single searchable string."""
+    parts = [
+        report.patient_summary or "",
+        " ".join(report.guideline_recommendations),
+        " ".join(a.action for a in report.suggested_next_steps),
+        " ".join(dx.diagnosis + " " + dx.reasoning for dx in report.differential_diagnosis),
+        " ".join(report.sources_cited),
+    ]
+    if report.conflicts:
+        parts.append(" ".join(c.description for c in report.conflicts))
+    return " ".join(parts)
+
+
+def _not_found() -> dict:
+    """Return a zero-score result dict."""
+    return {
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned_accuracy": 0.0,
+        "differential_accuracy": 0.0,
+        "match_location": "not_found",
+        "match_rank": -1,
+    }
 
 
 # ──────────────────────────────────────────────
@@ -324,7 +595,7 @@ def save_results(summary: ValidationSummary, filename: Optional[str] = None):
 
 
 def print_summary(summary: ValidationSummary):
-    """Pretty-print validation results to console."""
+    """Pretty-print validation results with stratified breakdown."""
     print(f"\n{'='*60}")
     print(f"  Validation Results: {summary.dataset.upper()}")
     print(f"{'='*60}")
@@ -332,12 +603,57 @@ def print_summary(summary: ValidationSummary):
     print(f"  Successful:       {summary.successful_cases}")
     print(f"  Failed:           {summary.failed_cases}")
     print(f"  Duration:         {summary.run_duration_sec:.1f}s")
-    print(f"\n  Metrics:")
+
+    # Known question types used for stratification
+    _KNOWN_TYPES = {
+        "diagnostic", "treatment", "mechanism", "lab_finding",
+        "pharmacology", "epidemiology", "ethics", "anatomy", "other",
+    }
+
+    # Overall metrics (exclude per-type breakdowns)
+    print(f"\n  Overall Metrics:")
     for metric, value in sorted(summary.metrics.items()):
+        if metric.startswith("count_"):
+            continue
+        if any(metric.endswith(f"_{qt}") for qt in _KNOWN_TYPES):
+            continue
+        if metric.endswith("_pipeline_appropriate"):
+            continue
         if "time" in metric and isinstance(value, (int, float)):
-            print(f"    {metric:30s} {value:.0f}ms")
+            print(f"    {metric:35s} {value:.0f}ms")
         elif isinstance(value, float):
-            print(f"    {metric:30s} {value:.1%}")
+            print(f"    {metric:35s} {value:.1%}")
         else:
-            print(f"    {metric:30s} {value}")
+            print(f"    {metric:35s} {value}")
+
+    # Stratified breakdown by question type
+    type_keys = sorted(
+        k[len("count_"):] for k in summary.metrics
+        if k.startswith("count_") and k != "count_pipeline_appropriate"
+    )
+    if type_keys:
+        print(f"\n  By Question Type:")
+        print(f"    {'Type':15s} {'Count':>6s} {'Top-1':>7s} {'Top-3':>7s} {'Mentioned':>10s} {'MCQ':>7s}")
+        print(f"    {'-'*15} {'-'*6} {'-'*7} {'-'*7} {'-'*10} {'-'*7}")
+        for qt in type_keys:
+            count = int(summary.metrics.get(f"count_{qt}", 0))
+            t1 = summary.metrics.get(f"top1_accuracy_{qt}")
+            t3 = summary.metrics.get(f"top3_accuracy_{qt}")
+            ma = summary.metrics.get(f"mentioned_accuracy_{qt}")
+            mcq = summary.metrics.get(f"mcq_accuracy_{qt}")
+            t1_s = f"{t1:.0%}" if t1 is not None else "-"
+            t3_s = f"{t3:.0%}" if t3 is not None else "-"
+            ma_s = f"{ma:.0%}" if ma is not None else "-"
+            mcq_s = f"{mcq:.0%}" if mcq is not None else "-"
+            print(f"    {qt:15s} {count:6d} {t1_s:>7s} {t3_s:>7s} {ma_s:>10s} {mcq_s:>7s}")
+
+    # Pipeline-appropriate subset
+    pa_count = summary.metrics.get("count_pipeline_appropriate", 0)
+    if pa_count > 0:
+        print(f"\n  Pipeline-Appropriate Subset ({int(pa_count)} cases):")
+        for m in ["top1_accuracy", "top3_accuracy", "mentioned_accuracy"]:
+            v = summary.metrics.get(f"{m}_pipeline_appropriate")
+            if v is not None:
+                print(f"    {m:35s} {v:.1%}")
+
     print(f"{'='*60}\n")

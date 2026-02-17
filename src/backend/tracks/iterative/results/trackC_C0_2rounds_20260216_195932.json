@@ -1,0 +1,140 @@
+{
+  "dataset": "trackC_C0_2rounds",
+  "total_cases": 3,
+  "successful_cases": 3,
+  "failed_cases": 0,
+  "metrics": {
+    "top1_accuracy": 0.0,
+    "top3_accuracy": 0.0,
+    "mentioned": 0.0,
+    "baseline_top1": 0.0,
+    "baseline_mentioned": 0.0,
+    "pipeline_success": 1.0,
+    "avg_iterations": 2.0,
+    "improvement_rate": 0.0
+  },
+  "run_duration_sec": 1397.6,
+  "timestamp": "2026-02-16T19:59:32.590142+00:00",
+  "per_case": [
+    {
+      "case_id": "medqa_1",
+      "source_dataset": "trackC_C0_2rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 365594,
+      "step_results": {},
+      "report_summary": "Patient underwent carpal tunnel repair complicated by an iatrogenic flexor tendon laceration, which was subsequently repaired. The primary concern is the management and potential complications followi",
+      "error": null,
+      "details": {
+        "iterations": 2,
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Iatrogenic flexor tendon laceration",
+          "Iatrogenic flexor tendon laceration",
+          "Iatrogenic flexor tendon laceration"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C0_2rounds",
+          "total_input_tokens": 1527,
+          "total_output_tokens": 3436,
+          "total_tokens": 4963,
+          "total_cost_usd": 0.009163,
+          "total_latency_ms": 156004,
+          "call_count": 2,
+          "cost_per_iteration": {
+            "1": 0.003943,
+            "2": 0.005219
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medqa_2",
+      "source_dataset": "trackC_C0_2rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 409796,
+      "step_results": {},
+      "report_summary": "A 67-year-old male presents with a 2-day history of tinnitus following his first course of neoadjuvant chemotherapy for transitional cell carcinoma of the bladder one week prior. Audiometry confirms 4",
+      "error": null,
+      "details": {
+        "iterations": 2,
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Chemotherapy-induced ototoxicity",
+          "Chemotherapy-induced ototoxicity",
+          "Chemotherapy-induced ototoxicity"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C0_2rounds",
+          "total_input_tokens": 1587,
+          "total_output_tokens": 3069,
+          "total_tokens": 4656,
+          "total_cost_usd": 0.008519,
+          "total_latency_ms": 142563,
+          "call_count": 2,
+          "cost_per_iteration": {
+            "1": 0.004201,
+            "2": 0.004318
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medqa_3",
+      "source_dataset": "trackC_C0_2rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 622236,
+      "step_results": {},
+      "report_summary": "A 61-year-old male presents with decreased urinary output and malaise two weeks after an emergency cardiac catheterization with stenting for unstable angina. He has a history of type 2 diabetes mellit",
+      "error": null,
+      "details": {
+        "iterations": 2,
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Acute Kidney Injury (AKI)",
+          "Acute Kidney Injury (AKI)",
+          "Acute Kidney Injury (AKI)"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C0_2rounds",
+          "total_input_tokens": 1686,
+          "total_output_tokens": 2866,
+          "total_tokens": 4552,
+          "total_cost_usd": 0.008261,
+          "total_latency_ms": 146103,
+          "call_count": 2,
+          "cost_per_iteration": {
+            "1": 0.003851,
+            "2": 0.00441
+          }
+        }
+      }
+    }
+  ]
+}

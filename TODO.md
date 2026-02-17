@@ -1,36 +1,61 @@
 # TODO — Next Session Action Items
 
-> **Last updated:** After 50-case MedQA validation, MedGemma HF Endpoint deployment, and documentation audit.  
-> **Read this first** if you're a new AI instance picking up this project.
+> **Last updated:** Feb 15, 2026 — Experimental track system built.  
+> **Read this first** if you're a new AI instance picking up this project.  
+> **See also:** `CLAUDE.md` (project intelligence) and `TRACKS.md` (track registry).
 
 ---
 
 ## High Priority (Do Next)
 
-### 1. Record a Demo Video
+### 1. Run Experimental Tracks
 
-The writeup says "Video: [To be recorded]". Record a ~3 min screencast showing:
-1. Pasting a patient case
-2. Watching the 6-step pipeline execute live
-3. Reviewing the CDS report (especially conflicts section)
-4. Showing validation results
+Three experimental tracks are built and ready to test. See `TRACKS.md` for full details.
 
-**Note:** Resume the HF Endpoint first (`medgemma-27b-cds` on HuggingFace). It costs ~$2.50/hr and is currently **paused**. Allow 5–15 min for cold start.
+**Track B — RAG Variants** (`src/backend/tracks/rag_variants/`)
+```bash
+cd src/backend
+python -m tracks.rag_variants.run_variants --max-cases 10   # smoke test
+python -m tracks.rag_variants.run_variants                    # full sweep
+```
+Tests 10 configurations: chunking strategies (none, fixed-256, fixed-512, sentence, overlap), embedding models (MiniLM-L6, MiniLM-L12, MPNet, MedCPT), top-k sweep (3, 5, 10), and reranking.
 
-### 2. Finalize Submission Writeup
+**Track C — Iterative Refinement** (`src/backend/tracks/iterative/`)
+```bash
+python -m tracks.iterative.run_iterative --max-cases 10
+python -m tracks.iterative.run_iterative
+```
+Tests 4 configurations: 2-round, 3-round, 5-round, and aggressive-critic. Produces cost/benefit data per iteration.
 
-`docs/writeup_draft.md` has been updated with 50-case MedQA results. Still needs:
-- Team name / member info filled in
-- Final polish for 3-page limit
-- Links to video and live demo (once recorded/deployed)
+**Track D — Arbitrated Parallel** (`src/backend/tracks/arbitrated/`)
+```bash
+python -m tracks.arbitrated.run_arbitrated --max-cases 10
+python -m tracks.arbitrated.run_arbitrated
+```
+Tests 4 configurations: 3-specialist/1-round, 5-specialist/1-round, 3-specialist/2-round, 5-specialist/2-round. Specialists: Cardiologist, Neurologist, ID, General IM, Emergency Medicine.
 
-### 3. Improve Diagnostic Accuracy (Optional)
+**Prerequisites:**
+- Resume HF Endpoint (`medgemma-27b-cds`) — allow 5–15 min cold start (~$2.50/hr)
+- Activate venv: `src/backend/venv/`
+- May need: `pip install sentence-transformers` for MedCPT/MPNet/reranking variants
 
-Current 50-case MedQA accuracy: 36% top-1, 38% mentioned. Potential improvements:
-- **Specialist agents (Option B):** Route to domain-specific reasoning agents for cardiology, neurology, etc.
-- **Better prompting:** Further refine `clinical_reasoning.py` system prompt
-- **Multi-turn reasoning:** Add a self-critique / verification step before synthesis
-- **Run MTSamples + PMC validation** for additional metrics
+### 2. Record the Demo Video
+
+Video script is ready: `docs/video_script.md`. Need to actually record:
+1. Resume HF Endpoint
+2. Start backend + frontend locally
+3. Record ~3 min screencast following the script
+4. Upload to YouTube/Loom and get the link
+
+### 3. Submit on Kaggle
+
+Kaggle writeup content is ready: `docs/kaggle_writeup.md`. Steps:
+1. Go to competition page → "New Writeup"
+2. Paste writeup content (fill in team name/member info first)
+3. Select tracks: Main Track + Agentic Workflow Prize
+4. Add links: video URL, GitHub repo, (optional) live demo
+5. Click Submit
+6. **Fill in [Your Name] placeholder** in the team table
 
 ---
 
@@ -89,17 +114,24 @@ Current input is manual text paste. A FHIR client could auto-populate patient da
 | MedGemma HF Endpoint | ✅ Deployed | `medgemma-27b-cds`, 1× A100 80 GB, scale-to-zero, **currently paused** |
 | MedQA Validation (50 cases) | ✅ Complete | 36% top-1, 38% mentioned, 94% pipeline success |
 | Validation Framework | ✅ Complete | MedQA done; MTSamples + PMC harnesses built but not yet run at scale |
+| **Track System** | ✅ **Scaffolded** | **4 tracks (A/B/C/D), shared utils, all runners built — needs experimentation** |
+| Track B — RAG Variants | ✅ Built | 10 variants (chunking × embedding × rerank), ready to run |
+| Track C — Iterative Refinement | ✅ Built | 4 configs (2/3/5-round + aggressive), ready to run |
+| Track D — Arbitrated Parallel | ✅ Built | 4 configs (3/5 specialists × 1/2 rounds), ready to run |
 | Documentation (8+ files) | ✅ Audited | All docs updated and cross-checked |
 | test_e2e.py | ✅ Fixed | Now asserts 6 steps + conflict_detection |
 | GitHub | ✅ Pushed | `bshepp/clinical-decision-support-agent` (master) |
+| Kaggle Writeup | ✅ Draft ready | `docs/kaggle_writeup.md` — paste into Kaggle |
+| Video Script | ✅ Ready | `docs/video_script.md` — 3 min narration |
 | Demo Video | ⬜ Not started | Required for submission |
-| Submission Writeup | 🔄 In progress | Template filled, needs final polish |
 
 **Key files:**
 - Backend entry: `src/backend/app/main.py`
 - Orchestrator: `src/backend/app/agent/orchestrator.py`
 - MedGemma service: `src/backend/app/services/medgemma.py`
 - Validation CLI: `src/backend/validation/run_validation.py`
+- **Track registry: `TRACKS.md`**
+- **Project intelligence: `CLAUDE.md`**
 - HF Endpoint guide: `docs/deploy_medgemma_hf.md`
 - All docs: `README.md`, `docs/architecture.md`, `docs/test_results.md`, `docs/writeup_draft.md`, `DEVELOPMENT_LOG.md`
 

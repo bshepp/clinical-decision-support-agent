@@ -1,0 +1,91 @@
+{
+  "dataset": "trackB_B1_fixed256",
+  "total_cases": 3,
+  "successful_cases": 3,
+  "failed_cases": 0,
+  "metrics": {
+    "top1_accuracy": 0.0,
+    "mentioned": 0.0,
+    "top3_accuracy": 0.0,
+    "pipeline_success": 1.0
+  },
+  "run_duration_sec": 469.8,
+  "timestamp": "2026-02-16T07:06:29.208536+00:00",
+  "per_case": [
+    {
+      "case_id": "medqa_1",
+      "source_dataset": "trackB_B1_fixed256",
+      "success": true,
+      "scores": {
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 116973,
+      "step_results": {
+        "parse": "completed",
+        "reason": "completed",
+        "drugs": "completed",
+        "guidelines": "failed",
+        "conflicts": "completed",
+        "synthesize": "completed"
+      },
+      "report_summary": "Patient underwent carpal tunnel repair with an iatrogenic flexor tendon laceration, which was subsequently repaired. The primary concern is the management and potential complications following this su",
+      "error": null,
+      "details": {
+        "rank": -1,
+        "match_location": "not_found"
+      }
+    },
+    {
+      "case_id": "medqa_2",
+      "source_dataset": "trackB_B1_fixed256",
+      "success": true,
+      "scores": {
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 126772,
+      "step_results": {
+        "parse": "completed",
+        "reason": "completed",
+        "drugs": "completed",
+        "guidelines": "failed",
+        "conflicts": "completed",
+        "synthesize": "completed"
+      },
+      "report_summary": "67-year-old male presenting with a 2-day history of tinnitus following his first course of neoadjuvant chemotherapy 1 week ago. Audiometry reveals 45 dB sensorineural hearing loss. PMH includes transi",
+      "error": null,
+      "details": {
+        "rank": -1,
+        "match_location": "not_found"
+      }
+    },
+    {
+      "case_id": "medqa_3",
+      "source_dataset": "trackB_B1_fixed256",
+      "success": true,
+      "scores": {
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 226061,
+      "step_results": {
+        "parse": "completed",
+        "reason": "completed",
+        "drugs": "completed",
+        "guidelines": "failed",
+        "conflicts": "completed",
+        "synthesize": "completed"
+      },
+      "report_summary": "A 61-year-old male presents two weeks post-cardiac catheterization with stenting for unstable angina, complaining of decreased urinary output and malaise. He has a history of Type 2 Diabetes Mellitus ",
+      "error": null,
+      "details": {
+        "rank": -1,
+        "match_location": "not_found"
+      }
+    }
+  ]
+}

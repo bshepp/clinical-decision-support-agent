@@ -1,0 +1,154 @@
+{
+  "dataset": "trackD_D2_3spec_2rounds",
+  "total_cases": 3,
+  "successful_cases": 3,
+  "failed_cases": 0,
+  "metrics": {
+    "top1_accuracy": 0.0,
+    "top3_accuracy": 0.0,
+    "mentioned": 0.0,
+    "baseline_top1": 0.0,
+    "baseline_mentioned": 0.0,
+    "pipeline_success": 1.0,
+    "improvement_rate": 0.0
+  },
+  "run_duration_sec": 2112.8,
+  "timestamp": "2026-02-17T00:09:40.417496+00:00",
+  "per_case": [
+    {
+      "case_id": "medqa_1",
+      "source_dataset": "trackD_D2_3spec_2rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 460739,
+      "step_results": {},
+      "report_summary": "Patient undergoing carpal tunnel repair experienced an iatrogenic flexor tendon laceration during the procedure, which was subsequently repaired. The patient is now in the postoperative period.",
+      "error": null,
+      "details": {
+        "rounds": 2,
+        "specialists": [
+          "im",
+          "cardio",
+          "id"
+        ],
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "cost_ledger": {
+          "track_id": "D_D2_3spec_2rounds",
+          "total_input_tokens": 9824,
+          "total_output_tokens": 10315,
+          "total_tokens": 20139,
+          "total_cost_usd": 0.035366,
+          "total_latency_ms": 512538,
+          "call_count": 10,
+          "cost_per_iteration": {
+            "1": 0.019224,
+            "2": 0.016143
+          }
+        },
+        "consensus_top_dx": [
+          "Iatrogenic flexor tendon laceration",
+          "Carpal tunnel syndrome",
+          "Surgical site infection"
+        ]
+      }
+    },
+    {
+      "case_id": "medqa_2",
+      "source_dataset": "trackD_D2_3spec_2rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 618077,
+      "step_results": {},
+      "report_summary": "67-year-old male presenting with a 2-day history of tinnitus and sensorineural hearing loss (45 dB) following his first course of chemotherapy for transitional cell carcinoma of the bladder one week p",
+      "error": null,
+      "details": {
+        "rounds": 2,
+        "specialists": [
+          "im",
+          "cardio",
+          "id"
+        ],
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "cost_ledger": {
+          "track_id": "D_D2_3spec_2rounds",
+          "total_input_tokens": 11445,
+          "total_output_tokens": 12261,
+          "total_tokens": 23706,
+          "total_cost_usd": 0.041689,
+          "total_latency_ms": 669745,
+          "call_count": 10,
+          "cost_per_iteration": {
+            "1": 0.022746,
+            "2": 0.018944
+          }
+        },
+        "consensus_top_dx": [
+          "Chemotherapy-induced ototoxicity",
+          "Sudden Sensorineural Hearing Loss (SSNHL)",
+          "Vestibular schwannoma (Acoustic neuroma)"
+        ]
+      }
+    },
+    {
+      "case_id": "medqa_3",
+      "source_dataset": "trackD_D2_3spec_2rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 1033969,
+      "step_results": {},
+      "report_summary": "A 61-year-old male presents with decreased urinary output and malaise two weeks after an emergency cardiac catheterization with stenting for unstable angina. He has a history of type 2 diabetes mellit",
+      "error": null,
+      "details": {
+        "rounds": 2,
+        "specialists": [
+          "im",
+          "cardio",
+          "id"
+        ],
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "cost_ledger": {
+          "track_id": "D_D2_3spec_2rounds",
+          "total_input_tokens": 10355,
+          "total_output_tokens": 15396,
+          "total_tokens": 25751,
+          "total_cost_usd": 0.046324,
+          "total_latency_ms": 821528,
+          "call_count": 9,
+          "cost_per_iteration": {
+            "1": 0.023197,
+            "2": 0.023127
+          }
+        },
+        "consensus_top_dx": [
+          "Acute Kidney Injury (AKI)",
+          "Infective Endocarditis (IE)",
+          "Contrast-Induced Nephropathy (CIN)"
+        ]
+      }
+    }
+  ]
+}

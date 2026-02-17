@@ -1,3 +1,4 @@
+# [Track A: Baseline]
 """
 Tool: Guideline Retrieval (RAG)
 

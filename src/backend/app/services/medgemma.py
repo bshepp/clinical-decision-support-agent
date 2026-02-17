@@ -1,3 +1,4 @@
+# [Track A: Baseline]
 """
 MedGemma Service — handles all communication with the MedGemma model.
 
@@ -90,6 +91,7 @@ class MedGemmaService:
         Generate a structured (Pydantic model) response from MedGemma.
 
         Appends JSON schema instructions to the prompt and parses the response.
+        Includes truncated-JSON repair and a single retry on failure.
 
         Args:
             prompt: The user prompt
@@ -109,18 +111,30 @@ class MedGemmaService:
             f"Do not include any text outside the JSON."
         )
 
-        raw = await self.generate(structured_prompt, system_prompt, max_tokens, temperature)
+        last_error: Optional[Exception] = None
+        for attempt in range(2):  # attempt 0 = first try, attempt 1 = retry
+            raw = await self.generate(structured_prompt, system_prompt, max_tokens, temperature)
+            json_str = self._extract_json(raw)
 
-        # Extract JSON from response (handle markdown code blocks)
-        json_str = self._extract_json(raw)
+            # Try parsing as-is first, then try repairing truncated JSON
+            for candidate in (json_str, self._repair_truncated_json(json_str)):
+                if candidate is None:
+                    continue
+                try:
+                    data = json.loads(candidate)
+                    return response_model.model_validate(data)
+                except (json.JSONDecodeError, Exception) as e:
+                    last_error = e
 
-        try:
-            data = json.loads(json_str)
-            return response_model.model_validate(data)
-        except (json.JSONDecodeError, Exception) as e:
-            logger.warning(f"Failed to parse structured response: {e}. Raw: {raw[:200]}")
-            # Retry with stricter prompt as fallback
-            raise ValueError(f"MedGemma returned invalid JSON for {response_model.__name__}: {e}")
+            logger.warning(
+                f"generate_structured attempt {attempt + 1} failed for "
+                f"{response_model.__name__}: {last_error}. Raw: {raw[:300]}"
+            )
+
+        raise ValueError(
+            f"MedGemma returned invalid JSON for {response_model.__name__} "
+            f"after 2 attempts: {last_error}"
+        )
 
     async def _generate_api(
         self, prompt: str, system_prompt: Optional[str], max_tokens: int, temperature: float
@@ -181,11 +195,16 @@ class MedGemmaService:
         # Try to find JSON in ```json ... ``` blocks
         if "```json" in text:
             start = text.index("```json") + 7
-            end = text.index("```", start)
+            end = text.find("```", start)
+            if end == -1:
+                # Unclosed code block — take everything after the opening tag
+                return text[start:].strip()
             return text[start:end].strip()
         if "```" in text:
             start = text.index("```") + 3
-            end = text.index("```", start)
+            end = text.find("```", start)
+            if end == -1:
+                return text[start:].strip()
             return text[start:end].strip()
         # Try to find raw JSON
         for i, char in enumerate(text):
@@ -200,3 +219,60 @@ class MedGemmaService:
                     if depth == 0:
                         return text[i : j + 1]
         return text.strip()
+
+    @staticmethod
+    def _repair_truncated_json(text: str) -> Optional[str]:
+        """
+        Attempt to repair truncated JSON by closing unclosed strings,
+        arrays, and objects.  Returns None if the input is empty or
+        repair is not feasible.
+        """
+        if not text or not text.strip():
+            return None
+
+        s = text.rstrip()
+
+        # Close unclosed string literal
+        # Count unescaped quotes — if odd, the last string is unterminated
+        in_string = False
+        i = 0
+        while i < len(s):
+            c = s[i]
+            if c == '\\' and in_string:
+                i += 2  # skip escaped char
+                continue
+            if c == '"':
+                in_string = not in_string
+            i += 1
+        if in_string:
+            s += '"'
+
+        # Close unclosed brackets/braces
+        stack: list[str] = []
+        in_string = False
+        i = 0
+        while i < len(s):
+            c = s[i]
+            if c == '\\' and in_string:
+                i += 2
+                continue
+            if c == '"':
+                in_string = not in_string
+            elif not in_string:
+                if c in ('{', '['):
+                    stack.append('}' if c == '{' else ']')
+                elif c in ('}', ']'):
+                    if stack:
+                        stack.pop()
+            i += 1
+
+        # Strip trailing comma before we close (invalid JSON)
+        s = s.rstrip()
+        if s and s[-1] == ',':
+            s = s[:-1]
+
+        # Append closing brackets in reverse order
+        for closer in reversed(stack):
+            s += closer
+
+        return s

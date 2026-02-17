@@ -1,3 +1,4 @@
+# [Track A: Baseline]
 """
 Application configuration via environment variables.
 """

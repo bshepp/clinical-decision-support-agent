@@ -1,0 +1,113 @@
+{
+  "dataset": "trackC_C3_aggressive",
+  "total_cases": 3,
+  "successful_cases": 2,
+  "failed_cases": 1,
+  "metrics": {
+    "top1_accuracy": 0.0,
+    "top3_accuracy": 0.0,
+    "mentioned": 0.0,
+    "baseline_top1": 0.0,
+    "baseline_mentioned": 0.0,
+    "pipeline_success": 0.6666666666666666,
+    "avg_iterations": 2.5,
+    "improvement_rate": 0.0
+  },
+  "run_duration_sec": 1302.3,
+  "timestamp": "2026-02-16T21:07:59.858802+00:00",
+  "per_case": [
+    {
+      "case_id": "medqa_1",
+      "source_dataset": "trackC_C3_aggressive",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 255797,
+      "step_results": {},
+      "report_summary": "Patient undergoing carpal tunnel repair experienced an iatrogenic flexor tendon laceration during the procedure. The tendon was repaired intraoperatively. The patient is now in the postoperative perio",
+      "error": null,
+      "details": {
+        "iterations": 1,
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Iatrogenic flexor tendon laceration",
+          "Iatrogenic flexor tendon laceration"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C3_aggressive",
+          "total_input_tokens": 795,
+          "total_output_tokens": 1298,
+          "total_tokens": 2093,
+          "total_cost_usd": 0.003789,
+          "total_latency_ms": 60172,
+          "call_count": 1,
+          "cost_per_iteration": {
+            "1": 0.003789
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medqa_2",
+      "source_dataset": "trackC_C3_aggressive",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 512682,
+      "step_results": {},
+      "report_summary": "A 67-year-old male presents with a 2-day history of tinnitus following his first course of chemotherapy for transitional cell carcinoma of the bladder one week prior. Audiometry confirms 45 dB sensori",
+      "error": null,
+      "details": {
+        "iterations": 4,
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Chemotherapy-induced ototoxicity",
+          "Chemotherapy-induced ototoxicity",
+          "Chemotherapy-induced ototoxicity",
+          "Chemotherapy-induced ototoxicity",
+          "Chemotherapy-induced ototoxicity"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C3_aggressive",
+          "total_input_tokens": 2960,
+          "total_output_tokens": 4795,
+          "total_tokens": 7755,
+          "total_cost_usd": 0.01403,
+          "total_latency_ms": 225375,
+          "call_count": 4,
+          "cost_per_iteration": {
+            "1": 0.00352,
+            "2": 0.00398,
+            "3": 0.003146,
+            "4": 0.003384
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medqa_3",
+      "source_dataset": "trackC_C3_aggressive",
+      "success": false,
+      "scores": {},
+      "pipeline_time_ms": 533776,
+      "step_results": {},
+      "report_summary": null,
+      "error": "synthesize: MedGemma returned invalid JSON for CDSReport after 2 attempts: Expecting ':' delimiter: line 198 column 16 (char 11678)",
+      "details": {}
+    }
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "dataset": "trackC_C1_3rounds",
+  "total_cases": 3,
+  "successful_cases": 3,
+  "failed_cases": 0,
+  "metrics": {
+    "top1_accuracy": 0.0,
+    "top3_accuracy": 0.0,
+    "mentioned": 0.3333333333333333,
+    "baseline_top1": 0.0,
+    "baseline_mentioned": 0.0,
+    "pipeline_success": 1.0,
+    "avg_iterations": 1.6666666666666667,
+    "improvement_rate": 0.0
+  },
+  "run_duration_sec": 1418.5,
+  "timestamp": "2026-02-16T20:23:11.055568+00:00",
+  "per_case": [
+    {
+      "case_id": "medqa_1",
+      "source_dataset": "trackC_C1_3rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 1.0
+      },
+      "pipeline_time_ms": 267710,
+      "step_results": {},
+      "report_summary": "Patient underwent carpal tunnel repair complicated by an iatrogenic flexor tendon laceration, which was subsequently repaired. The patient is in the immediate postoperative period.",
+      "error": null,
+      "details": {
+        "iterations": 1,
+        "rank": 6,
+        "match_location": "fulltext",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Iatrogenic flexor tendon laceration",
+          "Iatrogenic flexor tendon laceration"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C1_3rounds",
+          "total_input_tokens": 685,
+          "total_output_tokens": 1728,
+          "total_tokens": 2413,
+          "total_cost_usd": 0.004483,
+          "total_latency_ms": 81146,
+          "call_count": 1,
+          "cost_per_iteration": {
+            "1": 0.004483
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medqa_2",
+      "source_dataset": "trackC_C1_3rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 370516,
+      "step_results": {},
+      "report_summary": "A 67-year-old male presents with a 2-day history of tinnitus following his first course of chemotherapy for transitional cell carcinoma of the bladder. Pure tone audiometry shows a 45 dB hearing loss.",
+      "error": null,
+      "details": {
+        "iterations": 1,
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Chemotherapy-induced ototoxicity",
+          "Chemotherapy-induced ototoxicity"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C1_3rounds",
+          "total_input_tokens": 735,
+          "total_output_tokens": 1509,
+          "total_tokens": 2244,
+          "total_cost_usd": 0.004121,
+          "total_latency_ms": 70244,
+          "call_count": 1,
+          "cost_per_iteration": {
+            "1": 0.004121
+          }
+        }
+      }
+    },
+    {
+      "case_id": "medqa_3",
+      "source_dataset": "trackC_C1_3rounds",
+      "success": true,
+      "scores": {
+        "baseline_top1": 0.0,
+        "baseline_mentioned": 0.0,
+        "top1_accuracy": 0.0,
+        "top3_accuracy": 0.0,
+        "mentioned": 0.0
+      },
+      "pipeline_time_ms": 780220,
+      "step_results": {},
+      "report_summary": "A 61-year-old male presents with decreased urinary output and malaise two weeks after an emergency cardiac catheterization with stenting for unstable angina. He has a history of type 2 diabetes, osteo",
+      "error": null,
+      "details": {
+        "iterations": 3,
+        "rank": -1,
+        "match_location": "not_found",
+        "improved": false,
+        "per_iteration_top_dx": [
+          "Acute Kidney Injury (AKI)",
+          "Acute Kidney Injury (AKI)",
+          "Acute Kidney Injury (AKI)",
+          "Acute Kidney Injury (AKI)"
+        ],
+        "cost_ledger": {
+          "track_id": "C_C1_3rounds",
+          "total_input_tokens": 2492,
+          "total_output_tokens": 5401,
+          "total_tokens": 7893,
+          "total_cost_usd": 0.01454,
+          "total_latency_ms": 267587,
+          "call_count": 3,
+          "cost_per_iteration": {
+            "1": 0.004371,
+            "2": 0.004899,
+            "3": 0.005271
+          }
+        }
+      }
+    }
+  ]
+}
