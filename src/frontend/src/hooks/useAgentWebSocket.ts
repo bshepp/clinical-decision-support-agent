@@ -26,7 +26,20 @@ interface UseAgentWebSocketReturn {
   submitCase: (submission: CaseSubmission) => void;
 }
 
-const WS_URL = process.env.NEXT_PUBLIC_WS_URL || "ws://localhost:8002/ws/agent";
+function getWsUrl(): string {
+  // If explicitly set via env, use it
+  const envUrl = process.env.NEXT_PUBLIC_WS_URL;
+  if (envUrl) return envUrl;
+
+  // In browser: derive from current location (works for any deployment)
+  if (typeof window !== "undefined") {
+    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${proto}//${window.location.host}/ws/agent`;
+  }
+
+  // SSR fallback
+  return "ws://localhost:8002/ws/agent";
+}
 
 export function useAgentWebSocket(): UseAgentWebSocketReturn {
   const [steps, setSteps] = useState<Step[]>([]);
@@ -47,7 +60,7 @@ export function useAgentWebSocket(): UseAgentWebSocketReturn {
       wsRef.current.close();
     }
 
-    const ws = new WebSocket(WS_URL);
+    const ws = new WebSocket(getWsUrl());
     wsRef.current = ws;
 
     ws.onopen = () => {

@@ -14,7 +14,12 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # CORS
-    cors_origins: List[str] = ["http://localhost:3000", "http://localhost:5173"]
+    cors_origins: List[str] = [
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://demo.briansheppard.com",
+        "https://bshepp-cds-agent.hf.space",
+    ]
 
     # MedGemma
     medgemma_model_id: str = "google/medgemma"
