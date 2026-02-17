@@ -44,9 +44,8 @@ RUN pip install --no-cache-dir \
         sentence-transformers==3.1.1 \
         python-multipart==0.0.10
 
-# Copy backend source
+# Copy backend source (ChromaDB will auto-build from app/data/clinical_guidelines.json on first run)
 COPY src/backend/app/ ./app/
-COPY src/backend/data/ ./data/
 
 # ── Frontend standalone build ────────────────────────────────────
 # Next.js standalone output: self-contained server, no node_modules needed
