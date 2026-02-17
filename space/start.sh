@@ -13,10 +13,10 @@ uvicorn app.main:app \
     --timeout-keep-alive 300 \
     &
 
-# ── 2. Start Next.js frontend ──────────────────────────────────
+# ── 2. Start Next.js frontend (standalone mode) ────────────────
 echo "[2/3] Starting Next.js frontend on :3000 ..."
 cd /app/frontend
-PORT=3000 node_modules/.bin/next start -p 3000 &
+PORT=3000 HOSTNAME=0.0.0.0 node server.js &
 
 # ── 3. Start nginx reverse proxy ───────────────────────────────
 echo "[3/3] Starting nginx on :7860 ..."

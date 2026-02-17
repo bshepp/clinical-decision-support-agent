@@ -3,21 +3,23 @@ FROM node:20-slim AS frontend-build
 
 WORKDIR /app/frontend
 COPY src/frontend/package.json src/frontend/package-lock.json* ./
-RUN npm install --frozen-lockfile 2>/dev/null || npm install
+RUN npm ci 2>/dev/null || npm install
 
 COPY src/frontend/ ./
 
 # Build-time env: WebSocket and API go through the same origin via nginx
 ENV NEXT_PUBLIC_WS_URL=""
 ENV NEXT_PUBLIC_API_URL=""
+ENV NEXT_TELEMETRY_DISABLED=1
 
-RUN npm run build
+# Limit Node memory for constrained HF Space build environment
+RUN NODE_OPTIONS=--max-old-space-size=1536 npm run build
 
 
 # ── Stage 2: Production image ────────────────────────────────────
 FROM python:3.10-slim
 
-# System deps: nginx + node (for Next.js SSR)
+# System deps: nginx + node (for Next.js standalone server)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         nginx \
         curl \
@@ -46,13 +48,12 @@ RUN pip install --no-cache-dir \
 COPY src/backend/app/ ./app/
 COPY src/backend/data/ ./data/
 
-# ── Frontend built artifacts ─────────────────────────────────────
+# ── Frontend standalone build ────────────────────────────────────
+# Next.js standalone output: self-contained server, no node_modules needed
 WORKDIR /app/frontend
-COPY --from=frontend-build /app/frontend/.next ./.next
-COPY --from=frontend-build /app/frontend/node_modules ./node_modules
-COPY --from=frontend-build /app/frontend/package.json ./
+COPY --from=frontend-build /app/frontend/.next/standalone ./
+COPY --from=frontend-build /app/frontend/.next/static ./.next/static
 COPY --from=frontend-build /app/frontend/public ./public 2>/dev/null || true
-COPY src/frontend/next.config.js ./
 
 # ── Nginx config ─────────────────────────────────────────────────
 COPY space/nginx.conf /etc/nginx/nginx.conf
