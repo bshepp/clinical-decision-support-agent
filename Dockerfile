@@ -52,7 +52,7 @@ COPY src/backend/app/ ./app/
 WORKDIR /app/frontend
 COPY --from=frontend-build /app/frontend/.next/standalone ./
 COPY --from=frontend-build /app/frontend/.next/static ./.next/static
-COPY --from=frontend-build /app/frontend/public ./public 2>/dev/null || true
+RUN mkdir -p ./public
 
 # ── Nginx config ─────────────────────────────────────────────────
 COPY space/nginx.conf /etc/nginx/nginx.conf
