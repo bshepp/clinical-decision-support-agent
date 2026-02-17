@@ -1,3 +1,15 @@
+---
+title: CDS Agent
+emoji: 🏥
+colorFrom: blue
+colorTo: green
+sdk: docker
+app_port: 7860
+fullWidth: true
+custom_domains:
+  - demo.briansheppard.com
+---
+
 # CDS Agent — Clinical Decision Support System
 
 > An agentic clinical decision support application that orchestrates medical AI with specialized tools to assist clinicians in real time.
