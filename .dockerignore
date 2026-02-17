@@ -5,17 +5,34 @@ __pycache__
 node_modules
 .next
 *.md
+!README.md
 !src/frontend/package.json
 !space/README.md
+
+# Python virtual environments
+**/venv
+**/.venv
+**/env
+
+# Tracks, validation, test scripts
 src/backend/validation/
 src/backend/tracks/
 src/backend/test_*.py
 src/backend/analyze_*.py
 src/backend/check_*.py
+
+# Non-essential directories
 notebooks/
 demo/
 competition/
 models/
 docs/
+
+# Data files
 *.jsonl
 src/backend/validation/results/
+
+# Build artifacts
+*.egg-info
+dist/
+build/
