@@ -183,10 +183,10 @@ class ClinicalConflict(BaseModel):
     @classmethod
     def _normalise_severity(cls, v: str) -> str:
         return v.lower() if isinstance(v, str) else v
-    guideline_source: str = Field(..., description="Which guideline flagged this")
-    guideline_text: str = Field(..., description="What the guideline recommends")
-    patient_data: str = Field(..., description="Relevant patient data that conflicts")
-    description: str = Field(..., description="Plain-language explanation of the gap")
+    guideline_source: str = Field("", description="Which guideline flagged this")
+    guideline_text: str = Field("", description="What the guideline recommends")
+    patient_data: str = Field("", description="Relevant patient data that conflicts")
+    description: str = Field("", description="Plain-language explanation of the gap")
     suggested_resolution: Optional[str] = Field(
         None, description="Potential resolution for the clinician to consider"
     )
