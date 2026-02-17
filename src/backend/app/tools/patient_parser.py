@@ -67,11 +67,11 @@ class PatientParserTool:
             logger.info(f"Parsed patient profile: {profile.chief_complaint}")
             return profile
 
-        except ValueError:
-            # Fallback: If structured parsing fails, do basic extraction
-            logger.warning("Structured parsing failed, attempting basic extraction")
+        except Exception as e:
+            # Fallback: If any error occurs (API, parsing, etc.), do basic extraction
+            logger.warning(f"Patient parsing failed ({type(e).__name__}: {e}), using basic extraction")
             return PatientProfile(
                 chief_complaint=patient_text[:200],
                 history_of_present_illness=patient_text,
-                additional_notes="Auto-extracted from raw text (structured parsing failed)",
+                additional_notes=f"Auto-extracted from raw text (structured parsing failed: {type(e).__name__})",
             )

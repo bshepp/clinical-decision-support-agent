@@ -122,6 +122,9 @@ class Orchestrator:
         This is the main entry point. Each step is executed sequentially,
         with state flowing from one step to the next. Steps that don't
         depend on each other (drug check + guidelines) run in parallel.
+
+        If a critical step (parse, reason) fails, subsequent dependent
+        steps are marked as SKIPPED to avoid cascading errors.
         """
         case_id = str(uuid.uuid4())[:8]
         steps = self._create_steps(case)
@@ -134,10 +137,23 @@ class Orchestrator:
 
         try:
             # ── Step 1: Parse patient data ──
-            yield await self._run_step("parse", self._step_parse, case.patient_text)
+            step = await self._run_step("parse", self._step_parse, case.patient_text)
+            yield step
+
+            if step.status == AgentStepStatus.FAILED:
+                # Can't continue without patient profile — skip remaining steps
+                yield from self._skip_remaining_steps("parse")
+                self._state.completed_at = datetime.utcnow()
+                return
 
             # ── Step 2: Clinical reasoning ──
-            yield await self._run_step("reason", self._step_reason)
+            step = await self._run_step("reason", self._step_reason)
+            yield step
+
+            if step.status == AgentStepStatus.FAILED:
+                yield from self._skip_remaining_steps("reason")
+                self._state.completed_at = datetime.utcnow()
+                return
 
             # ── Step 3 & 4: Drug check + Guidelines (parallel) ──
             parallel_tasks = []
@@ -174,6 +190,20 @@ class Orchestrator:
                     step.status = AgentStepStatus.FAILED
                     step.error = f"Pipeline aborted: {str(e)}"
             raise
+
+    def _skip_remaining_steps(self, after_step_id: str) -> list[AgentStep]:
+        """Mark all steps after after_step_id as skipped. Returns them for yielding."""
+        skipped = []
+        found = False
+        for step in self._state.steps:
+            if step.step_id == after_step_id:
+                found = True
+                continue
+            if found and step.status == AgentStepStatus.PENDING:
+                step.status = AgentStepStatus.SKIPPED
+                step.error = f"Skipped: prerequisite step '{after_step_id}' failed"
+                skipped.append(step)
+        return skipped
 
     async def _run_step(self, step_id: str, fn, *args) -> AgentStep:
         """Execute a single step, tracking status and timing."""

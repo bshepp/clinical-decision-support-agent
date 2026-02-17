@@ -10,6 +10,7 @@ All tools that need MedGemma go through this service.
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Optional, Type, TypeVar
@@ -21,6 +22,10 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 T = TypeVar("T", bound=BaseModel)
+
+# Retry configuration for transient API errors (cold-start / 503)
+MAX_API_RETRIES = 3
+RETRY_BASE_DELAY = 5.0  # seconds, doubles on each retry
 
 
 class MedGemmaService:
@@ -146,6 +151,9 @@ class MedGemmaService:
         happens to be plain Gemma on Google AI Studio (which rejects the system
         role), we automatically fall back to folding the system prompt into the
         user message.
+
+        Includes retry with exponential backoff for transient errors (503 cold
+        start, connection errors, timeouts).
         """
         client = await self._get_client()
 
@@ -154,29 +162,59 @@ class MedGemmaService:
             messages.append({"role": "system", "content": system_prompt})
         messages.append({"role": "user", "content": prompt})
 
-        try:
-            response = await client.chat.completions.create(
-                model=settings.medgemma_model_id,
-                messages=messages,
-                max_tokens=max_tokens,
-                temperature=temperature,
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            # Fallback: fold system prompt into user message (Google AI Studio compat)
-            if system_prompt and "system" in str(e).lower():
-                logger.warning("Backend rejected system role — folding into user message.")
-                fallback_messages = [
-                    {"role": "user", "content": f"{system_prompt}\n\n{prompt}"}
-                ]
+        last_error: Optional[Exception] = None
+
+        for attempt in range(MAX_API_RETRIES):
+            try:
                 response = await client.chat.completions.create(
                     model=settings.medgemma_model_id,
-                    messages=fallback_messages,
+                    messages=messages,
                     max_tokens=max_tokens,
                     temperature=temperature,
                 )
                 return response.choices[0].message.content
-            raise
+            except Exception as e:
+                error_str = str(e).lower()
+                last_error = e
+
+                # Detect system-role rejection (Google AI Studio) — immediate fallback, no retry
+                if system_prompt and "system" in error_str:
+                    logger.warning("Backend rejected system role -- folding into user message.")
+                    fallback_messages = [
+                        {"role": "user", "content": f"{system_prompt}\n\n{prompt}"}
+                    ]
+                    try:
+                        response = await client.chat.completions.create(
+                            model=settings.medgemma_model_id,
+                            messages=fallback_messages,
+                            max_tokens=max_tokens,
+                            temperature=temperature,
+                        )
+                        return response.choices[0].message.content
+                    except Exception as e2:
+                        last_error = e2
+                        error_str = str(e2).lower()
+
+                # Retry on transient errors (503, 502, 429, connection, timeout)
+                is_transient = any(
+                    keyword in error_str
+                    for keyword in ["503", "502", "429", "service unavailable", "overloaded",
+                                    "connection", "timeout", "timed out", "temporarily"]
+                )
+                if is_transient and attempt < MAX_API_RETRIES - 1:
+                    delay = RETRY_BASE_DELAY * (2 ** attempt)
+                    logger.warning(
+                        f"MedGemma API transient error (attempt {attempt + 1}/{MAX_API_RETRIES}): "
+                        f"{e}. Retrying in {delay:.0f}s..."
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                # Non-transient or final attempt — log and raise
+                logger.error(f"MedGemma API error (attempt {attempt + 1}/{MAX_API_RETRIES}): {e}")
+                break
+
+        raise last_error
 
     async def _generate_local(
         self, prompt: str, system_prompt: Optional[str], max_tokens: int, temperature: float
