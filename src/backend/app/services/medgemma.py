@@ -27,6 +27,10 @@ T = TypeVar("T", bound=BaseModel)
 MAX_API_RETRIES = 3
 RETRY_BASE_DELAY = 5.0  # seconds, doubles on each retry
 
+# Readiness probe configuration
+READINESS_TIMEOUT = 180  # max seconds to wait for model warm-up
+READINESS_POLL_INTERVAL = 5  # seconds between readiness checks
+
 
 class MedGemmaService:
     """
@@ -57,6 +61,71 @@ class MedGemmaService:
                     "openai package required for API mode. Install with: pip install openai"
                 )
         return self._client
+
+    async def check_readiness(self) -> bool:
+        """
+        Lightweight probe to check if the MedGemma endpoint is warm and
+        accepting requests.  Sends a tiny 1-token generate call.
+
+        Returns True if the model responds, False on any transient error.
+        """
+        if self._mode != "api":
+            return True  # local mode is always "ready"
+        try:
+            client = await self._get_client()
+            response = await client.chat.completions.create(
+                model=settings.medgemma_model_id,
+                messages=[{"role": "user", "content": "ping"}],
+                max_tokens=1,
+                temperature=0.0,
+            )
+            return bool(response.choices)
+        except Exception as e:
+            logger.debug(f"Readiness probe failed: {e}")
+            return False
+
+    async def wait_until_ready(
+        self,
+        timeout: float = READINESS_TIMEOUT,
+        poll_interval: float = READINESS_POLL_INTERVAL,
+        on_waiting: Optional[Any] = None,
+    ) -> bool:
+        """
+        Poll check_readiness() until the model is warm or timeout expires.
+
+        Args:
+            timeout: Maximum seconds to wait.
+            poll_interval: Seconds between probes.
+            on_waiting: Optional async callback(elapsed_seconds, message) invoked
+                        each time we're still waiting — used to stream status to
+                        the client.
+
+        Returns:
+            True if the model became ready, False if timeout was reached.
+        """
+        import time
+        start = time.monotonic()
+        attempt = 0
+        while True:
+            attempt += 1
+            if await self.check_readiness():
+                logger.info("MedGemma readiness probe succeeded (%.1fs)", time.monotonic() - start)
+                return True
+
+            elapsed = time.monotonic() - start
+            if elapsed >= timeout:
+                logger.error("MedGemma readiness timeout after %.0fs", elapsed)
+                return False
+
+            msg = (
+                f"Warming up MedGemma model... "
+                f"({int(elapsed)}s elapsed, attempt {attempt})"
+            )
+            logger.info(msg)
+            if on_waiting:
+                await on_waiting(elapsed, msg)
+
+            await asyncio.sleep(poll_interval)
 
     async def generate(
         self,

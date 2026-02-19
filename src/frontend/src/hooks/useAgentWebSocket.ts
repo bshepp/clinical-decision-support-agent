@@ -22,6 +22,8 @@ interface UseAgentWebSocketReturn {
   steps: Step[];
   report: any | null;
   isRunning: boolean;
+  isWarmingUp: boolean;
+  warmUpMessage: string | null;
   error: string | null;
   submitCase: (submission: CaseSubmission) => void;
 }
@@ -45,6 +47,8 @@ export function useAgentWebSocket(): UseAgentWebSocketReturn {
   const [steps, setSteps] = useState<Step[]>([]);
   const [report, setReport] = useState<any | null>(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [isWarmingUp, setIsWarmingUp] = useState(false);
+  const [warmUpMessage, setWarmUpMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -54,6 +58,8 @@ export function useAgentWebSocket(): UseAgentWebSocketReturn {
     setReport(null);
     setError(null);
     setIsRunning(true);
+    setIsWarmingUp(false);
+    setWarmUpMessage(null);
 
     // Close existing connection
     if (wsRef.current) {
@@ -73,6 +79,16 @@ export function useAgentWebSocket(): UseAgentWebSocketReturn {
       switch (data.type) {
         case "ack":
           // Pipeline acknowledged
+          break;
+
+        case "warming_up":
+          setIsWarmingUp(true);
+          setWarmUpMessage(data.message);
+          break;
+
+        case "model_ready":
+          setIsWarmingUp(false);
+          setWarmUpMessage(null);
           break;
 
         case "step_update":
@@ -114,5 +130,5 @@ export function useAgentWebSocket(): UseAgentWebSocketReturn {
     };
   }, []);
 
-  return { steps, report, isRunning, error, submitCase };
+  return { steps, report, isRunning, isWarmingUp, warmUpMessage, error, submitCase };
 }

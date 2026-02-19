@@ -11,12 +11,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.agent.orchestrator import Orchestrator
 from app.models.schemas import CaseSubmission
+from app.services.medgemma import MedGemmaService
 
+logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -46,7 +49,37 @@ async def agent_websocket(websocket: WebSocket):
         # Send acknowledgment
         await websocket.send_json({
             "type": "ack",
-            "message": "Case received. Starting agent pipeline...",
+            "message": "Case received. Checking model readiness...",
+        })
+
+        # ── Readiness gate: wait for MedGemma to be warm ──
+        medgemma = MedGemmaService()
+
+        async def _send_warming(elapsed: float, message: str):
+            """Stream warm-up progress to client."""
+            try:
+                await websocket.send_json({
+                    "type": "warming_up",
+                    "message": message,
+                    "elapsed_seconds": int(elapsed),
+                })
+            except Exception:
+                pass  # client may have disconnected
+
+        ready = await medgemma.wait_until_ready(on_waiting=_send_warming)
+        if not ready:
+            await websocket.send_json({
+                "type": "error",
+                "message": (
+                    "MedGemma model did not become ready within the timeout. "
+                    "The endpoint may be starting up — please try again in a minute."
+                ),
+            })
+            return
+
+        await websocket.send_json({
+            "type": "model_ready",
+            "message": "MedGemma is ready. Starting agent pipeline...",
         })
 
         # Run the orchestrator and stream updates

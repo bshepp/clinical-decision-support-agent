@@ -7,7 +7,7 @@ import { CDSReport } from "@/components/CDSReport";
 import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
 
 export default function Home() {
-  const { steps, report, isRunning, error, submitCase } = useAgentWebSocket();
+  const { steps, report, isRunning, isWarmingUp, warmUpMessage, error, submitCase } = useAgentWebSocket();
   const [hasSubmitted, setHasSubmitted] = useState(false);
 
   const handleSubmit = (patientText: string) => {
@@ -72,6 +72,21 @@ export default function Home() {
             <div className="lg:col-span-2">
               {report ? (
                 <CDSReport report={report} />
+              ) : isWarmingUp ? (
+                <div className="flex items-center justify-center h-64 text-amber-600">
+                  <div className="text-center">
+                    <div className="animate-pulse w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
+                      <span className="text-xl">&#9881;</span>
+                    </div>
+                    <p className="font-medium">Model Warming Up</p>
+                    <p className="text-sm text-amber-500 mt-1">
+                      {warmUpMessage || "Waiting for MedGemma endpoint..."}
+                    </p>
+                    <p className="text-xs text-gray-400 mt-2">
+                      This happens when the model scales from zero. Usually takes 1-2 minutes.
+                    </p>
+                  </div>
+                </div>
               ) : isRunning ? (
                 <div className="flex items-center justify-center h-64 text-gray-400">
                   <div className="text-center">

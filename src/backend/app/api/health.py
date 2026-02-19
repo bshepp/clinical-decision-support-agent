@@ -24,3 +24,17 @@ async def config_check():
         "hf_token_set": bool(settings.hf_token),
         "medgemma_max_tokens": settings.medgemma_max_tokens,
     }
+
+
+@router.get("/api/health/model")
+async def model_readiness():
+    """Check if the MedGemma endpoint is warm and accepting requests."""
+    from app.services.medgemma import MedGemmaService
+
+    service = MedGemmaService()
+    ready = await service.check_readiness()
+    return {
+        "ready": ready,
+        "model_id": settings.medgemma_model_id,
+        "base_url_set": bool(settings.medgemma_base_url),
+    }
