@@ -142,7 +142,8 @@ class Orchestrator:
 
             if step.status == AgentStepStatus.FAILED:
                 # Can't continue without patient profile — skip remaining steps
-                yield from self._skip_remaining_steps("parse")
+                for skipped in self._skip_remaining_steps("parse"):
+                    yield skipped
                 self._state.completed_at = datetime.utcnow()
                 return
 
@@ -151,7 +152,8 @@ class Orchestrator:
             yield step
 
             if step.status == AgentStepStatus.FAILED:
-                yield from self._skip_remaining_steps("reason")
+                for skipped in self._skip_remaining_steps("reason"):
+                    yield skipped
                 self._state.completed_at = datetime.utcnow()
                 return
 
