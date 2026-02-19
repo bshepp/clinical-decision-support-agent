@@ -26,6 +26,7 @@ interface UseAgentWebSocketReturn {
   warmUpMessage: string | null;
   error: string | null;
   submitCase: (submission: CaseSubmission) => void;
+  reset: () => void;
 }
 
 function getWsUrl(): string {
@@ -130,5 +131,18 @@ export function useAgentWebSocket(): UseAgentWebSocketReturn {
     };
   }, []);
 
-  return { steps, report, isRunning, isWarmingUp, warmUpMessage, error, submitCase };
+  const reset = useCallback(() => {
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+    setSteps([]);
+    setReport(null);
+    setError(null);
+    setIsRunning(false);
+    setIsWarmingUp(false);
+    setWarmUpMessage(null);
+  }, []);
+
+  return { steps, report, isRunning, isWarmingUp, warmUpMessage, error, submitCase, reset };
 }

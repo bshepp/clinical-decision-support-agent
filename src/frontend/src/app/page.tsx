@@ -1,23 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { PatientInput } from "@/components/PatientInput";
 import { AgentPipeline } from "@/components/AgentPipeline";
 import { CDSReport } from "@/components/CDSReport";
 import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
+import { reportToMarkdown } from "@/lib/reportToMarkdown";
 
 export default function Home() {
-  const { steps, report, isRunning, isWarmingUp, warmUpMessage, error, submitCase } = useAgentWebSocket();
+  const { steps, report, isRunning, isWarmingUp, warmUpMessage, error, submitCase, reset } = useAgentWebSocket();
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [lastPatientText, setLastPatientText] = useState("");
 
   const handleSubmit = (patientText: string) => {
     setHasSubmitted(true);
+    setLastPatientText(patientText);
     submitCase({
       patient_text: patientText,
       include_drug_check: true,
       include_guidelines: true,
     });
   };
+
+  const handleNewCase = useCallback(() => {
+    reset();
+    setHasSubmitted(false);
+    setLastPatientText("");
+  }, [reset]);
+
+  const handleRetry = useCallback(() => {
+    if (lastPatientText) {
+      handleSubmit(lastPatientText);
+    }
+  }, [lastPatientText]);
+
+  const handleDownload = useCallback(() => {
+    if (!report) return;
+    const md = reportToMarkdown(report);
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cds-report-${new Date().toISOString().slice(0, 19).replace(/:/g, "-")}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [report]);
 
   return (
     <main className="min-h-screen">
@@ -61,9 +90,46 @@ export default function Home() {
             {/* Agent Pipeline (left) */}
             <div className="lg:col-span-1">
               <AgentPipeline steps={steps} isRunning={isRunning} />
+
+              {/* Error display with retry/reset */}
               {error && (
-                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                  {error}
+                <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-700 text-sm mb-3">{error}</p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleRetry}
+                      className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 hover:bg-red-700 rounded-lg transition-colors"
+                    >
+                      Try Again
+                    </button>
+                    <button
+                      onClick={handleNewCase}
+                      className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+                    >
+                      New Case
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* New Case button when pipeline finished (not running, no error) */}
+              {!isRunning && !error && steps.length > 0 && (
+                <div className="mt-4 flex gap-2">
+                  <button
+                    onClick={handleNewCase}
+                    className="flex-1 px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg transition-colors"
+                  >
+                    New Case
+                  </button>
+                  {report && (
+                    <button
+                      onClick={handleDownload}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-300 rounded-lg transition-colors"
+                      title="Download report as Markdown"
+                    >
+                      Download .md
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -73,17 +139,25 @@ export default function Home() {
               {report ? (
                 <CDSReport report={report} />
               ) : isWarmingUp ? (
-                <div className="flex items-center justify-center h-64 text-amber-600">
-                  <div className="text-center">
-                    <div className="animate-pulse w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center mx-auto mb-4">
-                      <span className="text-xl">&#9881;</span>
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center max-w-md">
+                    <div className="relative mx-auto mb-5 w-14 h-14">
+                      <div className="absolute inset-0 rounded-full border-4 border-amber-200" />
+                      <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-t-transparent animate-spin" />
+                      <div className="absolute inset-0 flex items-center justify-center text-xl text-amber-600">
+                        &#9881;
+                      </div>
                     </div>
-                    <p className="font-medium">Model Warming Up</p>
-                    <p className="text-sm text-amber-500 mt-1">
+                    <p className="font-semibold text-amber-700 text-base">
+                      Model Warming Up
+                    </p>
+                    <p className="text-sm text-amber-600 mt-1">
                       {warmUpMessage || "Waiting for MedGemma endpoint..."}
                     </p>
-                    <p className="text-xs text-gray-400 mt-2">
-                      This happens when the model scales from zero. Usually takes 1-2 minutes.
+                    <p className="text-xs text-gray-400 mt-3 leading-relaxed">
+                      The MedGemma model scales from zero when inactive.
+                      This usually takes 1-2 minutes. The pipeline will start
+                      automatically once the model is ready.
                     </p>
                   </div>
                 </div>
@@ -92,6 +166,31 @@ export default function Home() {
                   <div className="text-center">
                     <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
                     <p>Agent pipeline running...</p>
+                  </div>
+                </div>
+              ) : error && steps.length === 0 ? (
+                /* Full-screen error when nothing has even started (e.g. WS connection failed) */
+                <div className="flex items-center justify-center h-64">
+                  <div className="text-center max-w-sm">
+                    <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+                      <span className="text-red-500 text-xl">!</span>
+                    </div>
+                    <p className="font-medium text-gray-800 mb-1">Connection Failed</p>
+                    <p className="text-sm text-gray-500 mb-4">{error}</p>
+                    <div className="flex gap-2 justify-center">
+                      <button
+                        onClick={handleRetry}
+                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                      >
+                        Try Again
+                      </button>
+                      <button
+                        onClick={handleNewCase}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
+                      >
+                        New Case
+                      </button>
+                    </div>
                   </div>
                 </div>
               ) : null}
