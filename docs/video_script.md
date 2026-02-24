@@ -8,13 +8,12 @@
 
 ## PRE-RECORDING CHECKLIST
 
-- [ ] Resume HF Endpoint `medgemma-27b-cds` (~5–15 min cold start, ~$2.50/hr)
-- [ ] Start backend: `cd src/backend && uvicorn app.main:app --host 0.0.0.0 --port 8000`
-- [ ] Start frontend: `cd src/frontend && npm run dev`
-- [ ] Open browser to `http://localhost:3000`
+- [ ] Ensure HF Dedicated Endpoint is running (check `https://bshepp-cds-agent.hf.space/api/health/config`)
+- [ ] Open browser to `https://demo.briansheppard.com` (or `https://bshepp-cds-agent.hf.space`)
 - [ ] Close unnecessary tabs/notifications
-- [ ] Test one case end-to-end before recording to confirm endpoint is warm
+- [ ] Submit one case end-to-end before recording to confirm model is warm (watch for warm-up screen)
 - [ ] Browser zoom ~110-125% for readability on video
+- [ ] **Local fallback** (if Space is down): `cd src/backend && uvicorn app.main:app --host 0.0.0.0 --port 8002` + `cd src/frontend && npm run dev`, then open `http://localhost:3000`
 
 ---
 
@@ -36,9 +35,9 @@
 
 **[SCREEN: App interface — PatientInput component visible]**
 
-> "Let me show you how it works. Here's a patient case — a 62-year-old male presenting with crushing substernal chest pain, diaphoresis, and nausea. He has a history of hypertension and diabetes, currently on lisinopril, metformin, and atorvastatin."
+> "Let me show you how it works. I'll load a built-in sample case — a 55-year-old male presenting to the ED with acute substernal chest pain radiating to his left arm and jaw, with diaphoresis and nausea. He has hypertension, type 2 diabetes, and hyperlipidemia, and he's on metformin, lisinopril, atorvastatin, and aspirin."
 
-**[ACTION: Click a sample case button OR paste the case text, then click Submit]**
+**[ACTION: Click the "Chest Pain (55M)" sample case button, then click "Analyze Patient Case"]**
 
 > "When I submit this case, the agent pipeline kicks off. You can see each step executing in real time on the left."
 
@@ -46,19 +45,15 @@
 
 > "Step 1 — MedGemma parses the free-text narrative into structured patient data: demographics, vitals, labs, medications, allergies, history."
 
-**[Wait for Step 1 to complete, ~8 seconds]**
+**[Wait for Step 1 to complete]**
 
 > "Step 2 — Clinical reasoning. MedGemma generates a ranked differential diagnosis with chain-of-thought reasoning. It's considering ACS, GERD, PE, aortic dissection — weighing evidence for and against each."
 
-**[Wait for Step 2 to complete, ~20 seconds]**
+**[Wait for Step 2 to complete]**
 
-> "Step 3 — Drug interaction check. This isn't the LLM guessing — it's querying the actual OpenFDA and RxNorm databases for his three medications. Real API data, not hallucination."
+> "Steps 3 and 4 run in parallel. Step 3 — Drug interaction check. This isn't the LLM guessing — it's querying the actual OpenFDA and RxNorm databases for his four medications. Real API data, not hallucination. Step 4 — Guideline retrieval. Our RAG system searches 62 curated clinical guidelines across 14 specialties. For this case it pulls the ACC/AHA chest pain and ACS guidelines."
 
-**[Wait for Step 3 to complete, ~11 seconds]**
-
-> "Step 4 — Guideline retrieval. Our RAG system searches 62 curated clinical guidelines across 14 specialties. For this case it pulls the ACC/AHA chest pain and ACS guidelines."
-
-**[Wait for Step 4 to complete, ~10 seconds]**
+**[Wait for Steps 3 & 4 to complete]**
 
 > "Step 5 — and this is what makes it a real safety tool — Conflict Detection. MedGemma compares what the guidelines recommend against what the patient is actually receiving. It surfaces omissions, contradictions, dosage concerns, and monitoring gaps."
 
@@ -66,7 +61,7 @@
 
 > "Step 6 — Synthesis. Everything gets integrated into a single comprehensive report."
 
-**[Wait for Step 6 to complete. Total pipeline ~60-90 seconds]**
+**[Wait for Step 6 to complete. Total pipeline ~2-3 minutes]**
 
 ---
 
@@ -74,7 +69,7 @@
 
 **[SCREEN: Scroll through the CDSReport component]**
 
-> "Here's the CDS report. At the top — the ranked differential diagnosis. ACS is correctly identified as the leading diagnosis, with clear reasoning."
+> "Here's the CDS report. At the top — the ranked differential diagnosis. ACS is correctly identified as the leading diagnosis, with clear reasoning. The elevated troponin and ST elevation in II, III, and aVF support an inferior STEMI."
 
 **[ACTION: Scroll to drug interactions section]**
 
@@ -86,7 +81,11 @@
 
 **[ACTION: Scroll to guidelines section]**
 
-> "And finally, cited guideline recommendations from authoritative sources — ACC/AHA, ADA, and others."
+> "Cited guideline recommendations from authoritative sources — ACC/AHA, ADA, and others."
+
+**[ACTION: Click the "Download .md" button in the left panel]**
+
+> "And clinicians can download the full report as Markdown for their records."
 
 ---
 
@@ -96,7 +95,7 @@
 
 > "Under the hood: MedGemma 27B powers four of six pipeline steps — parsing, reasoning, conflict detection, and synthesis. It's augmented with OpenFDA and RxNorm APIs for drug safety, and a 62-guideline RAG corpus for evidence-based recommendations.
 >
-> We validated on 50 MedQA USMLE cases with 94% pipeline reliability and 39% diagnostic mention rate on diagnostic questions — and that's before any fine-tuning.
+> We validated on 50 MedQA USMLE cases with 94% pipeline reliability and 38% diagnostic mention rate — before any fine-tuning.
 >
 > With 140 million ED visits per year in the U.S. alone, even a modest improvement in diagnostic completeness and medication safety represents lives saved. CDS Agent is built to make that happen."
 
@@ -113,10 +112,14 @@
 | Report Review | 40 sec | 2:40 |
 | Closing — Tech & Impact | 20 sec | 3:00 |
 
+> **Note on timing:** The pipeline typically takes 2-3 minutes on the live endpoint. You can speed up the wait portions (1.5x-2x) in post-editing while keeping narration at normal speed to fit within 3 minutes. Alternatively, record narration separately and overlay it.
+
 ## TIPS
 
-- **Speak during pipeline wait times** — the 60-90 sec pipeline execution is perfect narration time
+- **Warm up before recording** — Submit a test case first. If the model has scaled to zero you'll see a "Model Warming Up" spinner; wait for it to complete (~1-2 min) before the real recording
+- **Speak during pipeline wait times** — the pipeline execution is perfect narration time
 - **Don't rush** — the real-time pipeline visualization IS the demo; let it breathe
 - **Zoom into the Conflicts section** — it's the most visually impressive and differentiating feature
-- **If the endpoint is slow** — you can speed up the wait portions in post-editing (1.5×–2× speed) while keeping narration at normal speed
+- **If the endpoint is slow** — speed up wait portions in post-editing (1.5x-2x) while keeping narration at normal speed
+- **Retry resilience** — if a pipeline run fails, the "Try Again" button lets you retry without reloading the page
 - **Backup plan** — if the HF endpoint is down, you can use Google AI Studio with Gemma 3 27B IT as a fallback (update .env accordingly)
