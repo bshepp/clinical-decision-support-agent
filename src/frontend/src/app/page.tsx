@@ -140,7 +140,7 @@ export default function Home() {
                 <CDSReport report={report} />
               ) : isWarmingUp ? (
                 <div className="flex items-center justify-center h-64">
-                  <div className="text-center max-w-md">
+                  <div className="text-center max-w-lg">
                     <div className="relative mx-auto mb-5 w-14 h-14">
                       <div className="absolute inset-0 rounded-full border-4 border-amber-200" />
                       <div className="absolute inset-0 rounded-full border-4 border-amber-500 border-t-transparent animate-spin" />
@@ -148,16 +148,24 @@ export default function Home() {
                         &#9881;
                       </div>
                     </div>
-                    <p className="font-semibold text-amber-700 text-base">
-                      Model Warming Up
+                    <p className="font-semibold text-amber-700 text-lg">
+                      MedGemma 27B is Loading
                     </p>
                     <p className="text-sm text-amber-600 mt-1">
                       {warmUpMessage || "Waiting for MedGemma endpoint..."}
                     </p>
-                    <p className="text-xs text-gray-400 mt-3 leading-relaxed">
-                      The MedGemma model scales from zero when inactive.
-                      This usually takes 1-2 minutes. The pipeline will start
-                      automatically once the model is ready.
+                    <p className="text-sm text-gray-500 mt-3 leading-relaxed">
+                      This is a 27-billion parameter medical AI model running on
+                      dedicated GPUs. It scales to zero when inactive to save costs,
+                      so it needs <strong>3-5 minutes</strong> to load on first visit.
+                    </p>
+                    <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                      Please wait — the analysis will start automatically once the model is ready.
+                    </p>
+                    <p className="text-xs text-gray-400 mt-4 italic">
+                      While you wait: this pipeline will parse the patient case, generate
+                      a differential diagnosis, check drug interactions against real FDA
+                      databases, retrieve clinical guidelines, and detect care gaps.
                     </p>
                   </div>
                 </div>
