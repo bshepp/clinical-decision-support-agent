@@ -8,7 +8,7 @@ OpenAI-compatible API.
 
 | Feature | Details |
 |---|---|
-| **Model** | `google/medgemma-27b-text-it` (HAI-DEF, competition-required) |
+| **Model** | `google/medgemma-27b-text-it` (HAI-DEF) |
 | **Cost** | ~$2.50/hr (1× A100 80 GB on AWS) |
 | **Scale-to-zero** | Yes — no charges while idle |
 | **API format** | OpenAI-compatible (TGI) — zero code changes |
@@ -101,7 +101,7 @@ python -m validation.run_validation --medqa --max-cases 50 --seed 42 --delay 2
 |---|---|---|
 | Validation run (120 cases @ ~1 min/case) | ~2 hrs | ~$5 |
 | Development / debugging (4 hrs) | ~4 hrs | ~$10 |
-| Competition demo recording | ~1 hr | ~$2.50 |
+| Demo recording | ~1 hr | ~$2.50 |
 | **Total estimated** | **~7 hrs** | **~$17.50** |
 
 With scale-to-zero enabled, the endpoint automatically shuts down after 15 min

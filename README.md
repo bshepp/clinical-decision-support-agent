@@ -14,8 +14,8 @@ custom_domains:
 
 > An agentic clinical decision support application that orchestrates medical AI with specialized tools to assist clinicians in real time.
 
-**Origin:** [MedGemma Impact Challenge](https://www.kaggle.com/competitions/med-gemma-impact-challenge) (Kaggle / Google Research)  
-**Focus:** Building a genuinely impactful medical application — not just a competition entry.
+**Live demo:** [demo.briansheppard.com](https://demo.briansheppard.com)  
+**Origin:** Built for the [MedGemma Impact Challenge](https://www.kaggle.com/competitions/med-gemma-impact-challenge) (Kaggle / Google Research).
 
 ---
 
@@ -156,73 +156,44 @@ Sources include ACC/AHA, ADA, GOLD, GINA, IDSA, ACOG, AAN, APA, AAP, ACR, ASH, K
 
 ```
 medgemma_impact_challenge/
-├── README.md                           # This file
-├── DEVELOPMENT_LOG.md                  # Chronological build history & decisions
-├── SUBMISSION_GUIDE.md                 # Competition submission strategy
-├── RULES_SUMMARY.md                    # Competition rules checklist
+├── README.md
+├── CLAUDE.md                          # AI assistant context
+├── DEVELOPMENT_LOG.md                 # Build history & decisions
 ├── docs/
-│   ├── architecture.md                 # System architecture & design decisions
-│   ├── test_results.md                 # Detailed test results & benchmarks
-│   ├── writeup_draft.md               # Project writeup / summary
-│   └── deploy_medgemma_hf.md          # MedGemma HF Endpoint deployment guide
+│   ├── architecture.md                # System architecture & design
+│   ├── test_results.md                # Test results & benchmarks
+│   └── deploy_medgemma_hf.md          # HF Endpoint deployment guide
 ├── src/
-│   ├── backend/                        # Python FastAPI backend
-│   │   ├── .env.template              # Environment config template
-│   │   ├── .env                       # Local config (not committed)
-│   │   ├── requirements.txt           # Python dependencies (28 packages)
-│   │   ├── test_e2e.py               # End-to-end pipeline test
-│   │   ├── test_clinical_cases.py    # 22 clinical scenario test suite
-│   │   ├── test_rag_quality.py       # RAG retrieval quality tests (30 queries)
-│   │   ├── test_poll.py              # Simple case poller utility
-│   │   ├── validation/               # External dataset validation framework
-│   │   │   ├── base.py               # Core framework (runners, scorers, utilities)
-│   │   │   ├── harness_medqa.py      # MedQA (USMLE) diagnostic accuracy harness
-│   │   │   ├── harness_mtsamples.py  # MTSamples parse quality harness
-│   │   │   ├── harness_pmc.py        # PMC Case Reports diagnostic harness
-│   │   │   ├── run_validation.py     # Unified CLI runner
-│   │   │   ├── analyze_results.py    # Question-type categorization & analysis
-│   │   │   └── check_progress.py     # Checkpoint progress monitor
+│   ├── backend/
+│   │   ├── requirements.txt
+│   │   ├── test_e2e.py                # End-to-end pipeline test
+│   │   ├── test_clinical_cases.py     # 22 clinical scenario test suite
+│   │   ├── test_rag_quality.py        # RAG retrieval quality tests
+│   │   ├── validation/                # External dataset validation
+│   │   │   ├── harness_medqa.py       # MedQA (USMLE) accuracy
+│   │   │   ├── harness_mtsamples.py   # MTSamples parse quality
+│   │   │   └── harness_pmc.py         # PMC Case Reports accuracy
+│   │   ├── tracks/                    # Experimental pipeline variants
 │   │   └── app/
-│   │       ├── main.py               # FastAPI entry (CORS, routers, lifespan)
-│   │       ├── config.py             # Pydantic Settings (ports, models, dirs)
-│   │       ├── __init__.py
-│   │       ├── models/
-│   │       │   └── schemas.py        # All Pydantic models (~280 lines)
-│   │       ├── agent/
-│   │       │   └── orchestrator.py   # 6-step pipeline orchestrator (~300 lines)
-│   │       ├── services/
-│   │       │   └── medgemma.py       # LLM service (OpenAI-compatible API)
+│   │       ├── main.py                # FastAPI entry point
+│   │       ├── config.py              # Settings
+│   │       ├── agent/orchestrator.py  # 6-step pipeline orchestrator
+│   │       ├── services/medgemma.py   # LLM service (OpenAI-compatible)
+│   │       ├── models/schemas.py      # Pydantic data models
 │   │       ├── tools/
-│   │       │   ├── patient_parser.py      # Step 1: Free-text → structured data
-│   │       │   ├── clinical_reasoning.py  # Step 2: Differential diagnosis
-│   │       │   ├── drug_interactions.py   # Step 3: OpenFDA + RxNorm
-│   │       │   ├── guideline_retrieval.py # Step 4: RAG over ChromaDB
-│   │       │   ├── conflict_detection.py  # Step 5: Guideline vs patient conflicts
-│   │       │   └── synthesis.py           # Step 6: CDS report generation
-│   │       ├── data/
-│   │       │   └── clinical_guidelines.json  # 62 guidelines, 14 specialties
-│   │       └── api/
-│   │           ├── health.py         # GET /api/health
-│   │           ├── cases.py          # POST /api/cases/submit, GET /api/cases/{id}
-│   │           └── ws.py            # WebSocket /ws/agent
-│   └── frontend/                     # Next.js 14 + React 18 + TypeScript
-│       ├── package.json
-│       ├── next.config.js            # API proxy → backend
-│       ├── tailwind.config.js
+│   │       │   ├── patient_parser.py       # Step 1: Free-text → structured data
+│   │       │   ├── clinical_reasoning.py   # Step 2: Differential diagnosis
+│   │       │   ├── drug_interactions.py    # Step 3: OpenFDA + RxNorm
+│   │       │   ├── guideline_retrieval.py  # Step 4: RAG over ChromaDB
+│   │       │   ├── conflict_detection.py   # Step 5: Guideline vs patient gaps
+│   │       │   └── synthesis.py            # Step 6: CDS report generation
+│   │       ├── data/clinical_guidelines.json  # 62 guidelines, 14 specialties
+│   │       └── api/                   # REST + WebSocket endpoints
+│   └── frontend/                      # Next.js 14 + React 18 + TypeScript
 │       └── src/
-│           ├── app/
-│           │   ├── layout.tsx
-│           │   ├── page.tsx          # Main CDS interface
-│           │   └── globals.css
-│           ├── components/
-│           │   ├── PatientInput.tsx   # Patient case input + 3 sample cases
-│           │   ├── AgentPipeline.tsx  # Real-time step visualization
-│           │   └── CDSReport.tsx     # Final report renderer
-│           └── hooks/
-│               └── useAgentWebSocket.ts  # WebSocket state management
-├── notebooks/                        # Experiment notebooks
-├── models/                           # Fine-tuned models (future)
-└── demo/                             # Video & demo assets
+│           ├── components/            # PatientInput, AgentPipeline, CDSReport
+│           └── hooks/                 # WebSocket state management
+└── Dockerfile                         # HuggingFace Spaces deployment
 ```
 
 ---
@@ -344,20 +315,16 @@ curl -X POST http://localhost:8000/api/cases/submit \
 
 ---
 
-## Documentation Index
+## Documentation
 
 | Document | Description |
 |----------|-------------|
-| [README.md](README.md) | This file — overview, setup, results |
 | [docs/architecture.md](docs/architecture.md) | System architecture, pipeline design, design decisions |
 | [docs/test_results.md](docs/test_results.md) | Detailed test results, RAG benchmarks, pipeline timing |
-| [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) | Chronological build history, problems solved, decisions made |
-| [docs/writeup_draft.md](docs/writeup_draft.md) | Project writeup / summary |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute to the project |
-| [SECURITY.md](SECURITY.md) | Security policy and responsible disclosure |
-| [TODO.md](TODO.md) | Next-session action items and project state |
-| [SUBMISSION_GUIDE.md](SUBMISSION_GUIDE.md) | Competition submission strategy |
 | [docs/deploy_medgemma_hf.md](docs/deploy_medgemma_hf.md) | MedGemma HuggingFace Endpoint deployment guide |
+| [DEVELOPMENT_LOG.md](DEVELOPMENT_LOG.md) | Chronological build history, problems solved, decisions made |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | How to contribute |
+| [SECURITY.md](SECURITY.md) | Security policy and responsible disclosure |
 
 ---
 
