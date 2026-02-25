@@ -1,18 +1,27 @@
 ---
-title: CDS Agent
+title: Clinical Decision Support Agent — Powered by MedGemma
 emoji: 🏥
 colorFrom: blue
 colorTo: green
 sdk: docker
 app_port: 7860
 fullWidth: true
+tags:
+  - medgemma
+  - medical-ai
+  - clinical-decision-support
+  - healthcare
+  - agentic
+  - rag
+  - google
+  - hai-def
 custom_domains:
   - demo.briansheppard.com
 ---
 
-# CDS Agent — Clinical Decision Support System
+# Clinical Decision Support Agent
 
-> An agentic clinical decision support application that orchestrates medical AI with specialized tools to assist clinicians in real time.
+> An agentic clinical decision support system powered by MedGemma 27B that parses patient cases, generates differential diagnoses, checks drug interactions via FDA APIs, retrieves clinical guidelines, and detects care gaps — all in real time.
 
 **Live demo:** [demo.briansheppard.com](https://demo.briansheppard.com)  
 **Origin:** Built for the [MedGemma Impact Challenge](https://www.kaggle.com/competitions/med-gemma-impact-challenge) (Kaggle / Google Research).
