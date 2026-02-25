@@ -137,6 +137,7 @@ class Orchestrator:
 
         try:
             # ── Step 1: Parse patient data ──
+            yield self._mark_running("parse")
             step = await self._run_step("parse", self._step_parse, case.patient_text)
             yield step
 
@@ -148,6 +149,7 @@ class Orchestrator:
                 return
 
             # ── Step 2: Clinical reasoning ──
+            yield self._mark_running("reason")
             step = await self._run_step("reason", self._step_reason)
             yield step
 
@@ -160,8 +162,10 @@ class Orchestrator:
             # ── Step 3 & 4: Drug check + Guidelines (parallel) ──
             parallel_tasks = []
             if case.include_drug_check:
+                yield self._mark_running("drugs")
                 parallel_tasks.append(("drugs", self._step_drug_check))
             if case.include_guidelines:
+                yield self._mark_running("guidelines")
                 parallel_tasks.append(("guidelines", self._step_guidelines))
 
             if parallel_tasks:
@@ -178,9 +182,11 @@ class Orchestrator:
 
             # ── Step 5: Conflict Detection ──
             if case.include_guidelines:
+                yield self._mark_running("conflicts")
                 yield await self._run_step("conflicts", self._step_conflict_detection)
 
             # ── Step 6: Synthesis ──
+            yield self._mark_running("synthesize")
             yield await self._run_step("synthesize", self._step_synthesize)
 
             self._state.completed_at = datetime.utcnow()
@@ -206,6 +212,12 @@ class Orchestrator:
                 step.error = f"Skipped: prerequisite step '{after_step_id}' failed"
                 skipped.append(step)
         return skipped
+
+    def _mark_running(self, step_id: str) -> AgentStep:
+        """Mark a step as RUNNING and return it for immediate yielding."""
+        step = self._get_step(step_id)
+        step.status = AgentStepStatus.RUNNING
+        return step
 
     async def _run_step(self, step_id: str, fn, *args) -> AgentStep:
         """Execute a single step, tracking status and timing."""

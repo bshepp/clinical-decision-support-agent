@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { PatientInput } from "@/components/PatientInput";
 import { AgentPipeline } from "@/components/AgentPipeline";
 import { CDSReport } from "@/components/CDSReport";
+import { FeedbackWidget } from "@/components/FeedbackWidget";
 import { useAgentWebSocket } from "@/hooks/useAgentWebSocket";
 import { reportToMarkdown } from "@/lib/reportToMarkdown";
 
@@ -173,7 +174,13 @@ export default function Home() {
                 <div className="flex items-center justify-center h-64 text-gray-400">
                   <div className="text-center">
                     <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
-                    <p>Agent pipeline running...</p>
+                    <p className="text-gray-600 font-medium">Agent pipeline running...</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      Watch the steps on the left — the report will appear here when done.
+                    </p>
+                    <p className="text-xs text-gray-400 mt-3">
+                      Full analysis typically takes 2–4 minutes across 6 steps.
+                    </p>
                   </div>
                 </div>
               ) : error && steps.length === 0 ? (
@@ -206,6 +213,9 @@ export default function Home() {
           </div>
         )}
       </div>
+
+      {/* Feedback widget */}
+      <FeedbackWidget />
 
       {/* Disclaimer footer */}
       <footer className="fixed bottom-0 left-0 right-0 bg-amber-50 border-t border-amber-200 px-6 py-2">

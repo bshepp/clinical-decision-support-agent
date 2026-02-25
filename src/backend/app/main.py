@@ -6,7 +6,7 @@ import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import cases, health, ws
+from app.api import cases, feedback, health, ws
 from app.config import settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
@@ -30,6 +30,7 @@ app.add_middleware(
 # Routes
 app.include_router(health.router, tags=["health"])
 app.include_router(cases.router, prefix="/api/cases", tags=["cases"])
+app.include_router(feedback.router, tags=["feedback"])
 app.include_router(ws.router, prefix="/ws", tags=["websocket"])
 
 
