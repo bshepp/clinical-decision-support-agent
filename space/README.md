@@ -6,8 +6,6 @@ colorTo: green
 sdk: docker
 app_port: 7860
 fullWidth: true
-custom_domains:
-  - demo.briansheppard.com
 ---
 
 # CDS Agent — Agentic Clinical Decision Support

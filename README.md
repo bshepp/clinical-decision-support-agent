@@ -15,15 +15,13 @@ tags:
   - rag
   - google
   - hai-def
-custom_domains:
-  - demo.briansheppard.com
 ---
 
 # Clinical Decision Support Agent
 
 > An agentic clinical decision support system powered by MedGemma 27B that parses patient cases, generates differential diagnoses, checks drug interactions via FDA APIs, retrieves clinical guidelines, and detects care gaps — all in real time.
 
-**Live demo:** [demo.briansheppard.com](https://demo.briansheppard.com)  
+**App demo:** Available upon request  
 **Video demo:** [Watch on YouTube](https://youtu.be/7ycHK7sjrRY)  
 **Origin:** Built for the [MedGemma Impact Challenge](https://www.kaggle.com/competitions/med-gemma-impact-challenge) (Kaggle / Google Research).
 

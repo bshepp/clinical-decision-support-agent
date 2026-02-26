@@ -8,7 +8,7 @@
 
 **CDS Agent** is an agentic clinical decision support system that orchestrates MedGemma 27B across a 6-step pipeline to produce clinical decision support reports from free-text patient cases. Originally built for the MedGemma Impact Challenge (Kaggle / Google Research).
 
-**Live demo:** [demo.briansheppard.com](https://demo.briansheppard.com)
+**App demo:** Available upon request
 
 ---
 
