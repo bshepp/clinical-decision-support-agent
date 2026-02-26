@@ -73,6 +73,33 @@ export default function Home() {
         {!hasSubmitted ? (
           /* Input view */
           <div className="max-w-3xl mx-auto">
+            {/* Backend availability notice */}
+            <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg text-center">
+              <p className="text-sm text-blue-800">
+                The MedGemma backend is currently paused.{" "}
+                <strong>Contact me to spin it up for a live demo.</strong>
+              </p>
+              <div className="mt-2 flex items-center justify-center gap-4 text-sm">
+                <a
+                  href="https://github.com/bshepp/clinical-decision-support-agent"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-900 font-medium underline"
+                >
+                  GitHub Repo
+                </a>
+                <span className="text-blue-300">|</span>
+                <a
+                  href="https://huggingface.co/bshepp"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-blue-700 hover:text-blue-900 font-medium underline"
+                >
+                  Hugging Face Profile
+                </a>
+              </div>
+            </div>
+
             <div className="mb-8 text-center">
               <h2 className="text-xl font-semibold text-gray-800 mb-2">
                 Submit a Patient Case
