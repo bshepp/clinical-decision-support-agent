@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     app_name: str = "CDS Agent"
     debug: bool = True
 
+    # Privacy mode: when True, disables data retention for open-web deployment
+    # When False (default), full traceability is preserved for clinical environments
+    privacy_mode: bool = False
+    case_ttl_seconds: int = 300  # TTL for in-memory cases when privacy_mode=True
+
     # CORS
     cors_origins: List[str] = [
         "http://localhost:3000",

@@ -47,6 +47,10 @@ RUN pip install --no-cache-dir \
 # Copy backend source (ChromaDB will auto-build from app/data/clinical_guidelines.json on first run)
 COPY src/backend/app/ ./app/
 
+# Enable privacy mode for open-web deployment (disables data retention)
+# Set to "false" or omit for hospital/production environments with full traceability
+ENV PRIVACY_MODE=true
+
 # ── Frontend standalone build ────────────────────────────────────
 # Next.js standalone output: self-contained server, no node_modules needed
 WORKDIR /app/frontend

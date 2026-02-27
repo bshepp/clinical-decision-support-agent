@@ -200,10 +200,16 @@ class MedGemmaService:
                 except (json.JSONDecodeError, Exception) as e:
                     last_error = e
 
-            logger.warning(
-                f"generate_structured attempt {attempt + 1} failed for "
-                f"{response_model.__name__}: {last_error}. Raw: {raw[:300]}"
-            )
+            if settings.privacy_mode:
+                logger.warning(
+                    f"generate_structured attempt {attempt + 1} failed for "
+                    f"{response_model.__name__}: {last_error} (raw output redacted — privacy mode)"
+                )
+            else:
+                logger.warning(
+                    f"generate_structured attempt {attempt + 1} failed for "
+                    f"{response_model.__name__}: {last_error}. Raw: {raw[:300]}"
+                )
 
         raise ValueError(
             f"MedGemma returned invalid JSON for {response_model.__name__} "

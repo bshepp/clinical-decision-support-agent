@@ -46,6 +46,7 @@ async def startup():
         return val[:4] + "..." + val[-4:]
 
     logger.info("=== CDS Agent Backend Starting ===")
+    logger.info(f"  privacy_mode      : {settings.privacy_mode}")
     logger.info(f"  medgemma_base_url : {settings.medgemma_base_url or '(empty)'}")
     logger.info(f"  medgemma_model_id : {settings.medgemma_model_id}")
     logger.info(f"  medgemma_api_key  : {_mask(settings.medgemma_api_key)}")

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 
+from app.config import settings
 from app.models.schemas import PatientProfile
 from app.services.medgemma import MedGemmaService
 
@@ -64,7 +65,10 @@ class PatientParserTool:
                 temperature=0.1,  # Low temp for factual extraction
                 max_tokens=1500,
             )
-            logger.info(f"Parsed patient profile: {profile.chief_complaint}")
+            if settings.privacy_mode:
+                logger.info("Parsed patient profile (content redacted — privacy mode)")
+            else:
+                logger.info(f"Parsed patient profile: {profile.chief_complaint}")
             return profile
 
         except Exception as e:

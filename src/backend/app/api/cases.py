@@ -52,6 +52,8 @@ async def submit_case(case: CaseSubmission):
     # Use the orchestrator's actual case_id if available, otherwise the pre-generated one
     actual_id = orchestrator.state.case_id if orchestrator.state else case_id
     _cases[actual_id] = orchestrator
+    _case_timestamps[actual_id] = time.time()
+    _evict_expired_cases()
 
     return CaseResponse(
         case_id=actual_id,
@@ -63,6 +65,10 @@ async def submit_case(case: CaseSubmission):
 @router.get("/{case_id}", response_model=CaseResult)
 async def get_case(case_id: str):
     """Get the current state and results for a case."""
+    if settings.privacy_mode:
+        raise HTTPException(status_code=403, detail="Case retrieval is disabled in privacy mode")
+
+    _evict_expired_cases()
     orchestrator = _cases.get(case_id)
     if not orchestrator or not orchestrator.state:
         raise HTTPException(status_code=404, detail=f"Case {case_id} not found")
@@ -77,4 +83,7 @@ async def get_case(case_id: str):
 @router.get("/", response_model=list[str])
 async def list_cases():
     """List all case IDs."""
+    if settings.privacy_mode:
+        raise HTTPException(status_code=403, detail="Case listing is disabled in privacy mode")
+    _evict_expired_cases()
     return list(_cases.keys())

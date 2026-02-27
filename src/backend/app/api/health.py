@@ -23,6 +23,7 @@ async def config_check():
         "medgemma_model_id": settings.medgemma_model_id,
         "hf_token_set": bool(settings.hf_token),
         "medgemma_max_tokens": settings.medgemma_max_tokens,
+        "privacy_mode": settings.privacy_mode,
     }
 
 

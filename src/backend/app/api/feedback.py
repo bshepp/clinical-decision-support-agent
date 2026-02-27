@@ -28,19 +28,27 @@ class FeedbackSubmission(BaseModel):
 @router.post("/api/feedback")
 async def submit_feedback(feedback: FeedbackSubmission, request: Request):
     """Save user feedback to a JSONL file."""
+    from app.config import settings
+
     entry = {
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "message": feedback.message,
         "contact": feedback.contact,
         "page_url": feedback.page_url,
         "user_agent": feedback.user_agent,
-        "client_ip": request.client.host if request.client else None,
     }
+
+    # Only capture client IP when not in privacy mode
+    if not settings.privacy_mode:
+        entry["client_ip"] = request.client.host if request.client else None
 
     try:
         with open(FEEDBACK_FILE, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry) + "\n")
-        logger.info(f"Feedback saved: {feedback.message[:50]}...")
+        if settings.privacy_mode:
+            logger.info("Feedback saved (content redacted — privacy mode)")
+        else:
+            logger.info(f"Feedback saved: {feedback.message[:50]}...")
     except Exception as e:
         logger.error(f"Failed to save feedback: {e}")
         return {"status": "error", "message": "Failed to save feedback"}
@@ -50,7 +58,12 @@ async def submit_feedback(feedback: FeedbackSubmission, request: Request):
 
 @router.get("/api/feedback")
 async def list_feedback():
-    """List all feedback (for the developer). No auth — it's a demo."""
+    """List all feedback (for the developer)."""
+    from app.config import settings
+
+    if settings.privacy_mode:
+        return {"feedback": [], "count": 0, "message": "Feedback listing is disabled in privacy mode"}
+
     if not FEEDBACK_FILE.exists():
         return {"feedback": [], "count": 0}
 

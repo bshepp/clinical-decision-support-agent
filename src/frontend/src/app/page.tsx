@@ -250,6 +250,10 @@ export default function Home() {
           ⚠️ AI-generated clinical decision support — for demonstration purposes
           only. Does not replace professional medical judgment.
         </p>
+        <p className="text-center text-xs text-amber-600 mt-1">
+          🔒 Privacy: No patient data is stored. Case data is processed in-memory only and
+          discarded after your session. Text is sent to a hosted LLM endpoint for processing.
+        </p>
       </footer>
     </main>
   );
