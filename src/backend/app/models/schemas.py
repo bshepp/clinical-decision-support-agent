@@ -37,6 +37,7 @@ class Confidence(str, Enum):
     MODERATE = "moderate"
     HIGH = "high"
     VERY_HIGH = "very high"
+    UNRECOGNIZED = "unrecognized — requires review"
 
 
 class AgentStepStatus(str, Enum):
@@ -98,8 +99,57 @@ class DiagnosisCandidate(BaseModel):
     diagnosis: str = Field(..., description="Diagnosis name")
     icd10_code: Optional[str] = Field(None, description="ICD-10 code if known")
     likelihood: Confidence = Field(..., description="Estimated likelihood")
+    likelihood_raw: Optional[str] = Field(None, description="Original model output if it didn't match a standard value")
     supporting_evidence: List[str] = Field(default_factory=list, description="Evidence from patient data")
     reasoning: str = Field("", description="Clinical reasoning chain")
+
+    @field_validator("likelihood", mode="before")
+    @classmethod
+    def normalize_likelihood(cls, v: str) -> str:
+        """Map non-standard likelihood values to the closest Confidence enum member."""
+        if isinstance(v, Confidence):
+            return v
+        raw = str(v).strip().lower()
+        # Direct match
+        for member in Confidence:
+            if raw == member.value:
+                return member
+        # Fuzzy mapping for common LLM variations
+        mapping = {
+            "unlikely": "very low",
+            "very unlikely": "very low",
+            "rare": "very low",
+            "possible": "low",
+            "less likely": "low",
+            "somewhat likely": "moderate",
+            "medium": "moderate",
+            "intermediate": "moderate",
+            "likely": "high",
+            "probable": "high",
+            "very likely": "very high",
+            "highly likely": "very high",
+            "almost certain": "very high",
+        }
+        if raw in mapping:
+            return Confidence(mapping[raw])
+        # Unknown value — flag for clinical review, raw value preserved in likelihood_raw
+        return Confidence.UNRECOGNIZED
+
+    def __init__(self, **data):
+        # Capture the raw value before validation normalizes it
+        raw_val = data.get("likelihood")
+        super().__init__(**data)
+        if isinstance(raw_val, str):
+            raw_lower = raw_val.strip().lower()
+            known = {m.value for m in Confidence}
+            # Also check the fuzzy mapping keys
+            mapped = {
+                "unlikely", "very unlikely", "rare", "possible", "less likely",
+                "somewhat likely", "medium", "intermediate", "likely",
+                "probable", "very likely", "highly likely", "almost certain",
+            }
+            if raw_lower not in known and raw_lower not in mapped:
+                self.likelihood_raw = raw_val.strip()
 
 
 class RecommendedAction(BaseModel):

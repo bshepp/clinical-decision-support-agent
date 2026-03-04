@@ -5,6 +5,7 @@ interface Report {
   differential_diagnosis: Array<{
     diagnosis: string;
     likelihood: string;
+    likelihood_raw?: string;
     supporting_evidence: string[];
     reasoning: string;
   }>;
@@ -45,9 +46,12 @@ const SEVERITY_BADGE: Record<string, string> = {
 };
 
 const LIKELIHOOD_BADGE: Record<string, string> = {
+  "very high": "bg-red-200 text-red-800",
   high: "bg-red-100 text-red-700",
   moderate: "bg-yellow-100 text-yellow-700",
   low: "bg-gray-100 text-gray-600",
+  "very low": "bg-gray-50 text-gray-500",
+  "unrecognized \u2014 requires review": "bg-purple-100 text-purple-800 border border-purple-300",
 };
 
 const CONFLICT_TYPE_LABEL: Record<string, string> = {
@@ -118,7 +122,9 @@ export function CDSReport({ report }: CDSReportProps) {
                     LIKELIHOOD_BADGE[dx.likelihood] || LIKELIHOOD_BADGE.low
                   }`}
                 >
-                  {dx.likelihood} likelihood
+                  {dx.likelihood_raw
+                    ? `Requires review: "${dx.likelihood_raw}"`
+                    : `${dx.likelihood} likelihood`}
                 </span>
               </div>
               <p className="text-xs text-gray-600">{dx.reasoning}</p>
