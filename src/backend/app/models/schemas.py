@@ -32,9 +32,11 @@ class Severity(str, Enum):
 
 
 class Confidence(str, Enum):
+    VERY_LOW = "very low"
     LOW = "low"
     MODERATE = "moderate"
     HIGH = "high"
+    VERY_HIGH = "very high"
 
 
 class AgentStepStatus(str, Enum):
