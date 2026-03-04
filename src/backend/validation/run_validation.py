@@ -1,15 +1,19 @@
 """
 Unified validation runner for the Clinical Decision Support Agent.
 
-Runs all three dataset validations (MedQA, MTSamples, PMC Case Reports)
-and produces a combined summary report.
+Runs dataset validations (MedQA, MedMCQA, PubMedQA, MTSamples, PMC Case Reports),
+adversarial edge-case tests, and regression tests.
 
 Usage:
     # From src/backend directory:
     python -m validation.run_validation --all --max-cases 10
     python -m validation.run_validation --medqa --max-cases 20
+    python -m validation.run_validation --medmcqa --max-cases 50
+    python -m validation.run_validation --pubmedqa --max-cases 50
     python -m validation.run_validation --mtsamples --max-cases 15
     python -m validation.run_validation --pmc --max-cases 10
+    python -m validation.run_validation --adversarial
+    python -m validation.run_validation --regression
 
     # Fetch data only (no pipeline execution):
     python -m validation.run_validation --fetch-only
@@ -42,14 +46,22 @@ from validation.base import (
     save_results,
 )
 from validation.harness_medqa import fetch_medqa, validate_medqa
+from validation.harness_medmcqa import fetch_medmcqa, validate_medmcqa
+from validation.harness_pubmedqa import fetch_pubmedqa, validate_pubmedqa
 from validation.harness_mtsamples import fetch_mtsamples, validate_mtsamples
 from validation.harness_pmc import fetch_pmc_cases, validate_pmc
+from validation.test_adversarial import validate_adversarial
+from validation.test_regression import run_regression_suite
 
 
 async def run_all_validations(
     run_medqa: bool = True,
     run_mtsamples: bool = True,
     run_pmc: bool = True,
+    run_medmcqa: bool = False,
+    run_pubmedqa: bool = False,
+    run_adversarial: bool = False,
+    run_regression: bool = False,
     max_cases: int = 10,
     seed: int = 42,
     include_drug_check: bool = True,
@@ -132,6 +144,78 @@ async def run_all_validations(
             save_results(summary)
             results["pmc"] = summary
 
+    # ── MedMCQA ──
+    if run_medmcqa:
+        print("\n" + "=" * 60)
+        print("  DATASET 4: MedMCQA (Indian medical entrance exam accuracy)")
+        print("=" * 60)
+
+        cases = await fetch_medmcqa(max_cases=max_cases, seed=seed)
+
+        if fetch_only:
+            print(f"  Fetched {len(cases)} MedMCQA cases (fetch-only mode)")
+        else:
+            summary = await validate_medmcqa(
+                cases,
+                include_drug_check=include_drug_check,
+                include_guidelines=include_guidelines,
+                delay_between_cases=delay,
+                resume=resume,
+            )
+            print_summary(summary)
+            save_results(summary)
+            results["medmcqa"] = summary
+
+    # ── PubMedQA ──
+    if run_pubmedqa:
+        print("\n" + "=" * 60)
+        print("  DATASET 5: PubMedQA (biomedical yes/no/maybe reasoning)")
+        print("=" * 60)
+
+        cases = await fetch_pubmedqa(max_cases=max_cases, seed=seed)
+
+        if fetch_only:
+            print(f"  Fetched {len(cases)} PubMedQA cases (fetch-only mode)")
+        else:
+            summary = await validate_pubmedqa(
+                cases,
+                include_drug_check=include_drug_check,
+                include_guidelines=include_guidelines,
+                delay_between_cases=delay,
+                resume=resume,
+            )
+            print_summary(summary)
+            save_results(summary)
+            results["pubmedqa"] = summary
+
+    # ── Adversarial Tests ──
+    if run_adversarial and not fetch_only:
+        print("\n" + "=" * 60)
+        print("  ADVERSARIAL: Edge case & robustness tests")
+        print("=" * 60)
+
+        summary = await validate_adversarial(
+            include_drug_check=include_drug_check,
+            include_guidelines=include_guidelines,
+            delay_between_cases=delay,
+        )
+        print_summary(summary)
+        save_results(summary)
+        results["adversarial"] = summary
+
+    # ── Regression Tests ──
+    if run_regression and not fetch_only:
+        print("\n" + "=" * 60)
+        print("  REGRESSION: Known failure case tests")
+        print("=" * 60)
+
+        passed, total, failures = await run_regression_suite()
+        print(f"\n  Regression: {passed}/{total} passed")
+        if failures:
+            for f in failures:
+                print(f"    FAIL: {f}")
+        results["regression"] = {"passed": passed, "total": total, "failures": failures}
+
     # ── Combined Summary ──
     total_duration = time.time() - start
 
@@ -153,6 +237,16 @@ def _print_combined_summary(results: dict, total_duration: float):
     print(f"  {'-'*15} {'-'*6} {'-'*8} {'-'*25} {'-'*8}")
 
     for name, summary in results.items():
+        # Skip regression (different format)
+        if name == "regression":
+            reg = summary
+            print(
+                f"  {'regression':<15} {reg['total']:>6} "
+                f"{reg['passed']:>8} "
+                f"{'pass_rate':>25} {reg['passed']/max(reg['total'],1):>7.1%}"
+            )
+            continue
+
         # Pick the most important metric for each dataset
         if name == "medqa":
             key_metric = "top3_accuracy"
@@ -160,6 +254,12 @@ def _print_combined_summary(results: dict, total_duration: float):
             key_metric = "parse_success"
         elif name == "pmc":
             key_metric = "diagnostic_accuracy"
+        elif name == "medmcqa":
+            key_metric = "top3_accuracy"
+        elif name == "pubmedqa":
+            key_metric = "decision_accuracy"
+        elif name == "adversarial":
+            key_metric = "pass_rate"
         else:
             key_metric = list(summary.metrics.keys())[0] if summary.metrics else "N/A"
 
@@ -173,6 +273,13 @@ def _print_combined_summary(results: dict, total_duration: float):
     # All metrics
     print(f"\n  {'-' * 66}")
     for name, summary in results.items():
+        if name == "regression":
+            print(f"\n  REGRESSION metrics:")
+            print(f"    {'passed':<35} {summary['passed']}")
+            print(f"    {'total':<35} {summary['total']}")
+            if summary['failures']:
+                print(f"    {'failures':<35} {', '.join(summary['failures'])}")
+            continue
         print(f"\n  {name.upper()} metrics:")
         for metric, value in sorted(summary.metrics.items()):
             if "time" in metric and isinstance(value, (int, float)):
@@ -181,8 +288,14 @@ def _print_combined_summary(results: dict, total_duration: float):
                 print(f"    {metric:<35} {value:.1%}")
 
     # Totals
-    total_cases = sum(s.total_cases for s in results.values())
-    total_success = sum(s.successful_cases for s in results.values())
+    total_cases = sum(
+        s.total_cases if hasattr(s, 'total_cases') else s.get('total', 0)
+        for s in results.values()
+    )
+    total_success = sum(
+        s.successful_cases if hasattr(s, 'successful_cases') else s.get('passed', 0)
+        for s in results.values()
+    )
     print(f"\n  Total cases:     {total_cases}")
     print(f"  Total success:   {total_success}")
     print(f"  Total duration:  {total_duration:.1f}s ({total_duration/60:.1f}min)")
@@ -205,6 +318,9 @@ def _save_combined_report(results: dict, total_duration: float):
     }
 
     for name, summary in results.items():
+        if name == "regression":
+            combined["datasets"][name] = summary
+            continue
         combined["datasets"][name] = {
             "total_cases": summary.total_cases,
             "successful_cases": summary.successful_cases,
@@ -228,6 +344,10 @@ def main():
 Examples:
   python -m validation.run_validation --all --max-cases 10
   python -m validation.run_validation --medqa --max-cases 50
+  python -m validation.run_validation --medmcqa --max-cases 50
+  python -m validation.run_validation --pubmedqa --max-cases 50
+  python -m validation.run_validation --adversarial
+  python -m validation.run_validation --regression
   python -m validation.run_validation --fetch-only
   python -m validation.run_validation --medqa --pmc --max-cases 20 --no-drugs
         """,
@@ -235,10 +355,14 @@ Examples:
 
     # Dataset selection
     data_group = parser.add_argument_group("Datasets")
-    data_group.add_argument("--all", action="store_true", help="Run all three datasets")
-    data_group.add_argument("--medqa", action="store_true", help="Run MedQA validation")
+    data_group.add_argument("--all", action="store_true", help="Run all benchmark datasets (MedQA, MTSamples, PMC, MedMCQA, PubMedQA)")
+    data_group.add_argument("--medqa", action="store_true", help="Run MedQA (USMLE) validation")
+    data_group.add_argument("--medmcqa", action="store_true", help="Run MedMCQA (Indian medical entrance) validation")
+    data_group.add_argument("--pubmedqa", action="store_true", help="Run PubMedQA (biomedical yes/no/maybe) validation")
     data_group.add_argument("--mtsamples", action="store_true", help="Run MTSamples validation")
     data_group.add_argument("--pmc", action="store_true", help="Run PMC Case Reports validation")
+    data_group.add_argument("--adversarial", action="store_true", help="Run adversarial edge-case tests")
+    data_group.add_argument("--regression", action="store_true", help="Run regression test suite")
 
     # Configuration
     config_group = parser.add_argument_group("Configuration")
@@ -253,17 +377,32 @@ Examples:
     args = parser.parse_args()
 
     # Default to --all if nothing specified
-    if not any([args.all, args.medqa, args.mtsamples, args.pmc]):
+    if not any([args.all, args.medqa, args.medmcqa, args.pubmedqa,
+                args.mtsamples, args.pmc, args.adversarial, args.regression]):
         args.all = True
 
     run_medqa = args.all or args.medqa
     run_mtsamples = args.all or args.mtsamples
     run_pmc = args.all or args.pmc
+    run_medmcqa = args.all or args.medmcqa
+    run_pubmedqa = args.all or args.pubmedqa
+    run_adversarial_flag = args.adversarial  # --all does NOT auto-run adversarial/regression
+    run_regression_flag = args.regression
+
+    datasets_str = ""
+    for name, active in [
+        ("MedQA", run_medqa), ("MedMCQA", run_medmcqa),
+        ("PubMedQA", run_pubmedqa), ("MTSamples", run_mtsamples),
+        ("PMC", run_pmc), ("Adversarial", run_adversarial_flag),
+        ("Regression", run_regression_flag),
+    ]:
+        if active:
+            datasets_str += name + " "
 
     print("=" * 58)
     print("   Clinical Decision Support Agent - Validation Suite")
     print("=" * 58)
-    print(f"\n  Datasets:     {'MedQA ' if run_medqa else ''}{'MTSamples ' if run_mtsamples else ''}{'PMC ' if run_pmc else ''}")
+    print(f"\n  Datasets:     {datasets_str.strip()}")
     print(f"  Cases/dataset: {args.max_cases}")
     print(f"  Drug check:    {'Yes' if not args.no_drugs else 'No'}")
     print(f"  Guidelines:    {'Yes' if not args.no_guidelines else 'No'}")
@@ -274,6 +413,10 @@ Examples:
         run_medqa=run_medqa,
         run_mtsamples=run_mtsamples,
         run_pmc=run_pmc,
+        run_medmcqa=run_medmcqa,
+        run_pubmedqa=run_pubmedqa,
+        run_adversarial=run_adversarial_flag,
+        run_regression=run_regression_flag,
         max_cases=args.max_cases,
         seed=args.seed,
         include_drug_check=not args.no_drugs,
