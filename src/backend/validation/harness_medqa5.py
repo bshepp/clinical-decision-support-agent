@@ -149,8 +149,14 @@ async def fetch_medqa5(max_cases: int = 50, seed: int = 42) -> List[ValidationCa
 
 
 async def _download_medqa5(cache_path: Path) -> List[dict]:
-    """Download MedQA 5-option from HuggingFace Datasets API."""
-    all_rows = []
+    """Download MedQA from HuggingFace Datasets API and normalize format.
+
+    The HF Datasets API returns rows with keys:
+        sent1, sent2, ending0-3, label
+    We normalize to:
+        question, options (dict A-D), answer_idx, answer
+    """
+    raw_rows = []
 
     async with httpx.AsyncClient(timeout=60, follow_redirects=True) as client:
         offset = 0
@@ -168,26 +174,78 @@ async def _download_medqa5(cache_path: Path) -> List[dict]:
                     break
                 for row in rows:
                     row_data = row.get("row", row)
-                    all_rows.append(row_data)
+                    raw_rows.append(row_data)
                 offset += batch_size
                 if offset % 500 == 0:
-                    print(f"    Fetched {len(all_rows)} rows...")
+                    print(f"    Fetched {len(raw_rows)} rows...")
             except Exception as e:
                 logger.warning(f"Batch fetch failed at offset {offset}: {e}")
-                if all_rows:
+                if raw_rows:
                     break
                 # Fallback: try JSONL download
                 print(f"  Falling back to JSONL download...")
                 return await _download_medqa5_jsonl(cache_path)
 
-        if all_rows:
-            cache_path.write_text(
-                json.dumps(all_rows, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            print(f"  Cached {len(all_rows)} MedQA-5 cases to {cache_path}")
+    # Normalize HF Datasets format -> expected format
+    all_rows = []
+    for row in raw_rows:
+        normalized = _normalize_hf_row(row)
+        if normalized:
+            all_rows.append(normalized)
+
+    if all_rows:
+        cache_path.write_text(
+            json.dumps(all_rows, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        print(f"  Cached {len(all_rows)} MedQA-5 cases to {cache_path}")
 
     return all_rows
+
+
+def _normalize_hf_row(row: dict) -> Optional[dict]:
+    """Normalize a HuggingFace Datasets API row to standard MedQA format.
+
+    HF format: {sent1, sent2, ending0, ending1, ending2, ending3, label}
+    Standard:  {question, options: {A,B,C,D}, answer_idx, answer}
+    """
+    # Check if already in standard format
+    if "question" in row and "options" in row:
+        return row
+
+    # HF Datasets API format
+    sent1 = row.get("sent1", "")
+    sent2 = row.get("sent2", "")
+    question = f"{sent1} {sent2}".strip() if sent2 else sent1
+
+    if not question:
+        return None
+
+    # Build options dict from ending0-3
+    options = {}
+    for i in range(4):
+        key = f"ending{i}"
+        if key in row:
+            options[chr(65 + i)] = row[key]  # A, B, C, D
+
+    if not options:
+        return None
+
+    # Get correct answer
+    label = row.get("label", 0)
+    if isinstance(label, int):
+        answer_idx = chr(65 + label)  # 0->A, 1->B, etc.
+    else:
+        answer_idx = str(label)
+
+    answer_text = options.get(answer_idx, "")
+
+    return {
+        "question": question,
+        "options": options,
+        "answer_idx": answer_idx,
+        "answer": answer_text,
+    }
 
 
 async def _download_medqa5_jsonl(cache_path: Path) -> List[dict]:
@@ -381,7 +439,22 @@ async def validate_medqa5(
         # Ensure patient_text meets CaseSubmission min length (10 chars)
         patient_text = case.input_text
         if len(patient_text.strip()) < 10:
-            patient_text = case.ground_truth.get("full_question", case.input_text) or case.input_text
+            patient_text = case.ground_truth.get("full_question", "") or ""
+        if len(patient_text.strip()) < 10:
+            # Skip cases with insufficient text rather than crashing
+            print(f"SKIP (empty text)")
+            result = ValidationResult(
+                case_id=case.case_id,
+                source_dataset="medqa5",
+                success=False,
+                scores={},
+                details={"error": "insufficient patient_text"},
+                step_results={},
+                pipeline_time_ms=0,
+            )
+            results.append(result)
+            save_incremental(result, "medqa5")
+            continue
 
         state, report, error = await run_cds_pipeline(
             patient_text=patient_text,

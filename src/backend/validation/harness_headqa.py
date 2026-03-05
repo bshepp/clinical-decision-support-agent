@@ -407,7 +407,21 @@ async def validate_headqa(
         # Ensure patient_text meets CaseSubmission min length (10 chars)
         patient_text = case.input_text
         if len(patient_text.strip()) < 10:
-            patient_text = case.ground_truth.get("full_question", case.input_text) or case.input_text
+            patient_text = case.ground_truth.get("full_question", "") or ""
+        if len(patient_text.strip()) < 10:
+            print(f"SKIP (empty text)")
+            result = ValidationResult(
+                case_id=case.case_id,
+                source_dataset="headqa",
+                success=False,
+                scores={},
+                details={"error": "insufficient patient_text"},
+                step_results={},
+                pipeline_time_ms=0,
+            )
+            results.append(result)
+            save_incremental(result, "headqa")
+            continue
 
         state, report, error = await run_cds_pipeline(
             patient_text=patient_text,
