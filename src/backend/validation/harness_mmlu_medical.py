@@ -402,8 +402,13 @@ async def validate_mmlu_medical(
 
         case_start = time.monotonic()
 
+        # Ensure patient_text meets CaseSubmission min length (10 chars)
+        patient_text = case.input_text
+        if len(patient_text.strip()) < 10:
+            patient_text = case.ground_truth.get("full_question", case.input_text) or case.input_text
+
         state, report, error = await run_cds_pipeline(
-            patient_text=case.input_text,
+            patient_text=patient_text,
             include_drug_check=include_drug_check,
             include_guidelines=include_guidelines,
         )
