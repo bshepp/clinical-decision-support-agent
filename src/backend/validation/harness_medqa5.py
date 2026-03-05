@@ -117,6 +117,11 @@ async def fetch_medqa5(max_cases: int = 50, seed: int = 42) -> List[ValidationCa
         # Split question into vignette + stem
         vignette, question_stem = _split_question(question)
 
+        # Fallback: if vignette is too short for CaseSubmission (min 10 chars),
+        # use the full question text
+        if len(vignette.strip()) < 10:
+            vignette = question
+
         case_obj = ValidationCase(
             case_id=f"medqa5_{i:04d}",
             source_dataset="medqa5",

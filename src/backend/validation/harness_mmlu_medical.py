@@ -167,6 +167,11 @@ async def fetch_mmlu_medical(
         # Split question
         vignette, question_stem = _split_question(question)
 
+        # Fallback: if vignette is too short for CaseSubmission (min 10 chars),
+        # use the full question text
+        if len(vignette.strip()) < 10:
+            vignette = question
+
         case_obj = ValidationCase(
             case_id=f"mmlu_{subject}_{i:04d}",
             source_dataset="mmlu_medical",
