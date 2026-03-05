@@ -1,15 +1,19 @@
 """
 Unified validation runner for the Clinical Decision Support Agent.
 
-Runs dataset validations (MedQA, MedMCQA, PubMedQA, MTSamples, PMC Case Reports),
-adversarial edge-case tests, and regression tests.
+Runs dataset validations (MedQA, MedQA-5, MedMCQA, PubMedQA, MMLU-Medical,
+HeadQA, MTSamples, PMC Case Reports), adversarial edge-case tests, and
+regression tests.
 
 Usage:
     # From src/backend directory:
     python -m validation.run_validation --all --max-cases 10
     python -m validation.run_validation --medqa --max-cases 20
+    python -m validation.run_validation --medqa5 --max-cases 50
     python -m validation.run_validation --medmcqa --max-cases 50
     python -m validation.run_validation --pubmedqa --max-cases 50
+    python -m validation.run_validation --mmlu --max-cases 50
+    python -m validation.run_validation --headqa --max-cases 50
     python -m validation.run_validation --mtsamples --max-cases 15
     python -m validation.run_validation --pmc --max-cases 10
     python -m validation.run_validation --adversarial
@@ -46,8 +50,11 @@ from validation.base import (
     save_results,
 )
 from validation.harness_medqa import fetch_medqa, validate_medqa
+from validation.harness_medqa5 import fetch_medqa5, validate_medqa5
 from validation.harness_medmcqa import fetch_medmcqa, validate_medmcqa
 from validation.harness_pubmedqa import fetch_pubmedqa, validate_pubmedqa
+from validation.harness_mmlu_medical import fetch_mmlu_medical, validate_mmlu_medical
+from validation.harness_headqa import fetch_headqa, validate_headqa
 from validation.harness_mtsamples import fetch_mtsamples, validate_mtsamples
 from validation.harness_pmc import fetch_pmc_cases, validate_pmc
 from validation.test_adversarial import validate_adversarial
@@ -56,10 +63,13 @@ from validation.test_regression import run_regression_suite
 
 async def run_all_validations(
     run_medqa: bool = True,
+    run_medqa5: bool = False,
     run_mtsamples: bool = True,
     run_pmc: bool = True,
     run_medmcqa: bool = False,
     run_pubmedqa: bool = False,
+    run_mmlu: bool = False,
+    run_headqa: bool = False,
     run_adversarial: bool = False,
     run_regression: bool = False,
     max_cases: int = 10,
@@ -99,6 +109,28 @@ async def run_all_validations(
             print_summary(summary)
             save_results(summary)
             results["medqa"] = summary
+
+    # ── MedQA-5 (5-option variant) ──
+    if run_medqa5:
+        print("\n" + "=" * 60)
+        print("  DATASET: MedQA-5 (5-option USMLE-style, harder baseline)")
+        print("=" * 60)
+
+        cases = await fetch_medqa5(max_cases=max_cases, seed=seed)
+
+        if fetch_only:
+            print(f"  Fetched {len(cases)} MedQA-5 cases (fetch-only mode)")
+        else:
+            summary = await validate_medqa5(
+                cases,
+                include_drug_check=include_drug_check,
+                include_guidelines=include_guidelines,
+                delay_between_cases=delay,
+                resume=resume,
+            )
+            print_summary(summary)
+            save_results(summary)
+            results["medqa5"] = summary
 
     # ── MTSamples ──
     if run_mtsamples:
@@ -188,6 +220,50 @@ async def run_all_validations(
             save_results(summary)
             results["pubmedqa"] = summary
 
+    # ── MMLU-Medical ──
+    if run_mmlu:
+        print("\n" + "=" * 60)
+        print("  DATASET: MMLU-Medical (6 medical subtasks)")
+        print("=" * 60)
+
+        cases = await fetch_mmlu_medical(max_cases=max_cases, seed=seed)
+
+        if fetch_only:
+            print(f"  Fetched {len(cases)} MMLU-Medical cases (fetch-only mode)")
+        else:
+            summary = await validate_mmlu_medical(
+                cases,
+                include_drug_check=include_drug_check,
+                include_guidelines=include_guidelines,
+                delay_between_cases=delay,
+                resume=resume,
+            )
+            print_summary(summary)
+            save_results(summary)
+            results["mmlu_medical"] = summary
+
+    # ── HeadQA ──
+    if run_headqa:
+        print("\n" + "=" * 60)
+        print("  DATASET: HeadQA (Spanish healthcare exams, English)")
+        print("=" * 60)
+
+        cases = await fetch_headqa(max_cases=max_cases, seed=seed)
+
+        if fetch_only:
+            print(f"  Fetched {len(cases)} HeadQA cases (fetch-only mode)")
+        else:
+            summary = await validate_headqa(
+                cases,
+                include_drug_check=include_drug_check,
+                include_guidelines=include_guidelines,
+                delay_between_cases=delay,
+                resume=resume,
+            )
+            print_summary(summary)
+            save_results(summary)
+            results["headqa"] = summary
+
     # ── Adversarial Tests ──
     if run_adversarial and not fetch_only:
         print("\n" + "=" * 60)
@@ -258,6 +334,12 @@ def _print_combined_summary(results: dict, total_duration: float):
             key_metric = "top3_accuracy"
         elif name == "pubmedqa":
             key_metric = "decision_accuracy"
+        elif name == "medqa5":
+            key_metric = "top3_accuracy"
+        elif name == "mmlu_medical":
+            key_metric = "mcq_accuracy"
+        elif name == "headqa":
+            key_metric = "mcq_accuracy"
         elif name == "adversarial":
             key_metric = "pass_rate"
         else:
@@ -344,8 +426,11 @@ def main():
 Examples:
   python -m validation.run_validation --all --max-cases 10
   python -m validation.run_validation --medqa --max-cases 50
+  python -m validation.run_validation --medqa5 --max-cases 50
   python -m validation.run_validation --medmcqa --max-cases 50
   python -m validation.run_validation --pubmedqa --max-cases 50
+  python -m validation.run_validation --mmlu --max-cases 50
+  python -m validation.run_validation --headqa --max-cases 50
   python -m validation.run_validation --adversarial
   python -m validation.run_validation --regression
   python -m validation.run_validation --fetch-only
@@ -355,10 +440,13 @@ Examples:
 
     # Dataset selection
     data_group = parser.add_argument_group("Datasets")
-    data_group.add_argument("--all", action="store_true", help="Run all benchmark datasets (MedQA, MTSamples, PMC, MedMCQA, PubMedQA)")
-    data_group.add_argument("--medqa", action="store_true", help="Run MedQA (USMLE) validation")
+    data_group.add_argument("--all", action="store_true", help="Run all benchmark datasets")
+    data_group.add_argument("--medqa", action="store_true", help="Run MedQA (USMLE 4-option) validation")
+    data_group.add_argument("--medqa5", action="store_true", help="Run MedQA-5 (USMLE 5-option) validation")
     data_group.add_argument("--medmcqa", action="store_true", help="Run MedMCQA (Indian medical entrance) validation")
     data_group.add_argument("--pubmedqa", action="store_true", help="Run PubMedQA (biomedical yes/no/maybe) validation")
+    data_group.add_argument("--mmlu", action="store_true", help="Run MMLU-Medical (6 medical subtasks) validation")
+    data_group.add_argument("--headqa", action="store_true", help="Run HeadQA (Spanish healthcare exams) validation")
     data_group.add_argument("--mtsamples", action="store_true", help="Run MTSamples validation")
     data_group.add_argument("--pmc", action="store_true", help="Run PMC Case Reports validation")
     data_group.add_argument("--adversarial", action="store_true", help="Run adversarial edge-case tests")
@@ -377,23 +465,29 @@ Examples:
     args = parser.parse_args()
 
     # Default to --all if nothing specified
-    if not any([args.all, args.medqa, args.medmcqa, args.pubmedqa,
-                args.mtsamples, args.pmc, args.adversarial, args.regression]):
+    if not any([args.all, args.medqa, args.medqa5, args.medmcqa, args.pubmedqa,
+                args.mmlu, args.headqa, args.mtsamples, args.pmc,
+                args.adversarial, args.regression]):
         args.all = True
 
     run_medqa = args.all or args.medqa
+    run_medqa5 = args.all or args.medqa5
     run_mtsamples = args.all or args.mtsamples
     run_pmc = args.all or args.pmc
     run_medmcqa = args.all or args.medmcqa
     run_pubmedqa = args.all or args.pubmedqa
+    run_mmlu = args.all or args.mmlu
+    run_headqa = args.all or args.headqa
     run_adversarial_flag = args.adversarial  # --all does NOT auto-run adversarial/regression
     run_regression_flag = args.regression
 
     datasets_str = ""
     for name, active in [
-        ("MedQA", run_medqa), ("MedMCQA", run_medmcqa),
-        ("PubMedQA", run_pubmedqa), ("MTSamples", run_mtsamples),
-        ("PMC", run_pmc), ("Adversarial", run_adversarial_flag),
+        ("MedQA", run_medqa), ("MedQA-5", run_medqa5),
+        ("MedMCQA", run_medmcqa), ("PubMedQA", run_pubmedqa),
+        ("MMLU-Medical", run_mmlu), ("HeadQA", run_headqa),
+        ("MTSamples", run_mtsamples), ("PMC", run_pmc),
+        ("Adversarial", run_adversarial_flag),
         ("Regression", run_regression_flag),
     ]:
         if active:
@@ -411,10 +505,13 @@ Examples:
 
     asyncio.run(run_all_validations(
         run_medqa=run_medqa,
+        run_medqa5=run_medqa5,
         run_mtsamples=run_mtsamples,
         run_pmc=run_pmc,
         run_medmcqa=run_medmcqa,
         run_pubmedqa=run_pubmedqa,
+        run_mmlu=run_mmlu,
+        run_headqa=run_headqa,
         run_adversarial=run_adversarial_flag,
         run_regression=run_regression_flag,
         max_cases=args.max_cases,
