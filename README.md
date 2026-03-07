@@ -47,23 +47,23 @@ All six steps stream to the frontend in real time via WebSocket — the clinicia
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │                    FRONTEND (Next.js 14 + React)                    │
-│  Patient Case Input  │  Agent Activity Feed  │  CDS Report View    │
+│  Patient Case Input  │  Agent Activity Feed  │  CDS Report View     │
 └──────────────────────────┬──────────────────────────────────────────┘
                            │ REST API + WebSocket
-┌──────────────────────────▼──────────────────────────────────────────┐
+┌──────────────────────────▼────────────────────────────────────────── ┐
 │                     BACKEND (FastAPI + Python 3.10)                  │
 │                                                                      │
-│  ┌────────────────────────────────────────────────────────────────┐  │
-│  │                ORCHESTRATOR (6-Step Pipeline)                  │  │
-│  └──┬──────────┬──────────┬──────────┬──────────┬──────────┬─────┘  │
-│  ┌──▼───┐ ┌───▼────┐ ┌──▼───┐ ┌───▼────┐ ┌───▼─────┐ ┌──▼────┐  │
-│  │Parse │ │Reason  │ │ Drug │ │  RAG   │ │Conflict │ │Synth- │  │
-│  │Pati- │ │(LLM)   │ │Check │ │Guide-  │ │Detect-  │ │esize  │  │
-│  │ent   │ │Differ- │ │OpenFDA│ │lines   │ │ion      │ │(LLM)  │  │
-│  │Data  │ │ential  │ │RxNorm │ │ChromaDB│ │(LLM)    │ │Report │  │
-│  └──────┘ └────────┘ └──────┘ └────────┘ └─────────┘ └───────┘  │
+│  ┌───────────────────────────────────────────────────────────────┐   │
+│  │                ORCHESTRATOR (6-Step Pipeline)                 │   │
+│  └──┬──────────┬──────────┬──────────┬──────────┬──────────┬─────┘   │
+│  ┌──▼───┐ ┌───▼────┐ ┌──▼───┐ ┌───▼────┐ ┌───▼─────┐ ┌──▼────┐       │
+│  │Parse │ │Reason  │ │ Drug │ │  RAG   │ │Conflict │ │Synth- │       │
+│  │Pati- │ │(LLM)   │ │Check │ │Guide-  │ │Detect-  │ │esize  │       │
+│  │ent   │ │Differ- │ │OpenFDA││lines   │ │ion      │ │(LLM)  │       │
+│  │Data  │ │ential  │ │RxNorm ││ChromaDB│ │(LLM)    │ │Report │       │
+│  └──────┘ └────────┘ └──────┘ └────────┘ └─────────┘ └───────┘       │
 │                                                                      │
-│  External: OpenFDA API │ RxNorm/NLM API │ ChromaDB (local)          │
+│  External: OpenFDA API │ RxNorm/NLM API │ ChromaDB (local)           │
 └──────────────────────────────────────────────────────────────────────┘
 ```
 
